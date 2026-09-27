@@ -1,0 +1,110 @@
+---
+name: skill-mine
+description: Use when mining the memory corpus for recurring patterns worth promoting into new or improved skills — reads only the delta since the last sweep (watermark at .last-sweep), promotes at the 2nd recurrence, and proposes ranked candidates for per-candidate approval.
+---
+
+# /skill-mine
+
+Mine the corpus for recurring patterns and surface skill candidates.
+
+```bash
+MEM="${RAEMEMBERIT_MEMORY_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memory}"   # resolved at runtime, not baked in
+```
+
+## Steps
+
+### 0. Read the watermark — never re-read the whole corpus
+
+```bash
+cat "$MEM/.last-sweep" 2>/dev/null || echo "no prior sweep"
+```
+
+It holds the ISO date of the last completed sweep. **Read only interaction logs newer than it.**
+Re-reading every log to rediscover patterns already triaged is pure waste, and the delta is where
+new signal lives anyway.
+
+```bash
+LAST=$(cut -d' ' -f1 "$MEM/.last-sweep" 2>/dev/null || echo 0000-00-00)
+find "$MEM/interactions" -name '*.md' | awk -F/ -v l="$LAST" '$NF > l'
+```
+
+If the watermark is missing, find the newest prior sweep log, use its date, then **write the
+watermark** so this is the last time it has to be reconstructed.
+
+**Feedback, project and reference memories are still read in full** — there are few of them
+relative to the logs, they are the highest-signal source, and `grep -m1 '^description:'` across the
+tree is enough for most.
+
+### 0.1 The promotion threshold
+
+| Recurrence | Action |
+|---|---|
+| 1st occurrence | Leave it. One session is an anecdote. |
+| **2nd occurrence** | **Propose a candidate.** This is the threshold — do not wait for a third. |
+| 2nd occurrence of something a skill already covers | Propose an **improvement** to that skill, not a new one |
+| A recurring **correction** — the user had to say it twice | Highest rank regardless of count: friction outranks frequency |
+
+Dedupe against existing skills **and their descriptions** before proposing.
+
+### 1. Read the delta
+
+Every interaction log newer than the watermark, plus all of `feedback/`, `project/` and
+`reference/`. Do not stop at the index — go file by file.
+
+### 2. Identify patterns
+
+- **Recurrence** — the same sequence of actions in 2+ logs.
+- **Effort** — a log describing 3+ non-obvious steps to reach a result.
+- **Friction** — feedback entries describing a workflow the user had to correct more than once.
+- **Annotation** — "always do this", "every time", "next time", "the pattern is", "remember to".
+
+### 3. Synthesize candidates
+
+```
+**Candidate: /<slug>**
+Pattern source: <the memory files that evidence this>
+What it captures: <one sentence>
+Steps it would automate: <bullets>
+Confidence: high / medium / low
+```
+
+Rank by: (1) friction, (2) recurrence count, (3) step count.
+
+### 4. Present, then wait
+
+Show the ranked list. For each: **Create this skill? (yes / skip / modify)**. Write nothing until
+that candidate is approved.
+
+When one is approved, write it **with Bash**, not the Write tool — a new skill lands in the config
+directory's `commands/`, and Claude Code refuses the Write and Edit tools on paths inside a `.claude`
+directory as sensitive:
+
+```bash
+cat > "$RAEMEMBERIT_CONFIG/commands/<slug>.md" <<'EOF'
+---
+name: <slug>
+description: <mandatory — a skill without one is invisible to context routing>
+---
+...
+EOF
+```
+
+### 5. Log the outcome, then stamp the watermark
+
+Record which candidates were approved **and which were declined, with the reason**, so the next
+sweep does not re-propose them. Then, only after the sweep actually completes:
+
+```bash
+date +%Y-%m-%d > "$MEM/.last-sweep"
+echo "  candidates=<n> approved=<n> declined=<n>" >> "$MEM/.last-sweep"
+```
+
+Any new skill's `description:` is mandatory. A skill without one is invisible to context routing,
+and the sweep has then produced nothing usable.
+
+## Notes
+
+- Never write a skill file autonomously — every candidate needs its own approval.
+- Read logs in reverse-chronological order; stop after the most recent 30 unless an older one is
+  referenced by a newer one.
+- Read `feedback/` first. It is the highest-signal source for repeatable patterns.

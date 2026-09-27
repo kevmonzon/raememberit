@@ -188,6 +188,70 @@ else
 fi
 rm -f "$guard"
 
+echo "== the plugin is self-sufficient =="
+for f in install.sh engine/mem-write.sh engine/rebuild-index.sh starter/queries.json scaffold/memory/README.md commands/setup.md; do
+  [ -e "plugin/$f" ] && ok "ships $f" || bad "does not ship $f, which setup needs"
+done
+# It must NOT ship the standalone wiring fragment, and must not need it. Shipping it would invite
+# someone to merge hooks that the plugin already supplies — the doubling case, self-inflicted.
+[ -e plugin/engine/settings.fragment.json ] && bad "ships the standalone settings fragment" \
+                                            || ok "does not ship the standalone settings fragment"
+# Every command the plugin ships must be fully resolved: a leftover {{SLOT}} once made an installed
+# /recall grep a directory that did not exist and report a confident "no prior memory".
+if grep -l '{{' plugin/commands/*.md >/dev/null 2>&1; then
+  bad "a shipped command still contains an unfilled {{slot}}"
+else
+  ok "no unfilled slots in any shipped command ($(find plugin/commands -name '*.md' | wc -l | tr -d ' ') commands)"
+fi
+grep -q 'RAEMEMBERIT_MEMORY_DIR' plugin/commands/recall.md \
+  && ok "shipped commands resolve the corpus at runtime, not at install time" \
+  || bad "shipped commands do not resolve the corpus at runtime"
+
+echo "== install.sh --plugin =="
+# The end-to-end path, run FROM THE PLUGIN as a real user would, against a throwaway config dir.
+t2="$(mktemp -d)/.claude"
+mkdir -p "$t2/plugins/data/raememberit-skills-dir/bin"
+printf '#!/usr/bin/env bash\nexec bash /nowhere/mem-write.sh "$@"\n' > "$t2/plugins/data/raememberit-skills-dir/bin/mem-write.sh"
+if bash plugin/install.sh --plugin --config-dir "$t2" --no-guided --user Testee >/dev/null 2>&1; then
+  ok "plugin-mode install completes from inside the plugin"
+else
+  bad "plugin-mode install failed from inside the plugin"
+fi
+if [ -f "$t2/settings.json" ]; then
+  # No hooks: the plugin supplies them, and merging them here too fires every hook twice.
+  python3 -c 'import json,sys; d=json.load(open("'"$t2"'/settings.json")); sys.exit(0 if not d.get("hooks") else 1)' \
+    && ok "wires no hooks into settings (the plugin owns them)" || bad "wired hooks into settings as well as the plugin"
+  # No env: an explicit RAEMEMBERIT_* beats an option, so writing one would kill the manifest's knob.
+  python3 -c 'import json,sys; d=json.load(open("'"$t2"'/settings.json")); sys.exit(0 if not d.get("env") else 1)' \
+    && ok "writes no env (userConfig drives configuration)" || bad "wrote env, which would override the plugin options"
+  # The rule must name the version-free wrapper, never the versioned plugin path.
+  python3 -c 'import json,sys
+d=json.load(open("'"$t2"'/settings.json"))
+a=d.get("permissions",{}).get("allow",[])
+sys.exit(0 if any("/plugins/data/" in r and "mem-write.sh" in r for r in a) else 1)' \
+    && ok "permission rule names the stable \$CLAUDE_PLUGIN_DATA path" || bad "permission rule does not name the stable path"
+  python3 -c 'import json,sys
+d=json.load(open("'"$t2"'/settings.json"))
+a=d.get("permissions",{}).get("allow",[])
+sys.exit(1 if any("/plugins/cache/" in r for r in a) else 0)' \
+    && ok "no rule names the versioned install path" || bad "a rule names the versioned path and will break on update"
+else
+  bad "plugin-mode install wrote no settings.json"
+fi
+# It seeds a corpus, and leaves no standalone litter behind.
+[ -d "$t2/memory/feedback" ] && ok "seeds the corpus outside the plugin" || bad "did not seed a corpus"
+[ -d "$t2/raememberit" ] && bad "created an empty raememberit/ that plugin mode does not own" \
+                         || ok "no leftover raememberit/ directory"
+[ -d "$t2/commands" ] && bad "created a commands/ directory it does not populate" \
+                      || ok "no leftover commands/ directory"
+# Idempotence: a second run must not duplicate rules or disturb the corpus.
+before="$(python3 -c 'import json;d=json.load(open("'"$t2"'/settings.json"));print(len(d["permissions"]["allow"]))')"
+bash plugin/install.sh --plugin --config-dir "$t2" --no-guided >/dev/null 2>&1 || true
+after="$(python3 -c 'import json;d=json.load(open("'"$t2"'/settings.json"));print(len(d["permissions"]["allow"]))')"
+[ "$before" = "$after" ] && ok "re-running adds no duplicate permission rules ($after)" \
+                         || bad "re-running changed the rule count: $before -> $after"
+rm -rf "$(dirname "$t2")"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" = "0" ]

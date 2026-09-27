@@ -24,6 +24,42 @@ cp -R engine plugin/engine
 # The settings fragment is the standalone wiring; a plugin user never merges it, so it is not shipped.
 rm -f plugin/engine/settings.fragment.json
 
+# --- 1b. what setup needs in order to run: the installer and what it seeds from ----------------
+# install.sh resolves its own directory as the source, so placing it at the plugin root next to
+# engine/, starter/ and scaffold/ makes `--plugin` work unchanged. ONE installer, both routes — the
+# alternative was a second implementation of corpus seeding, which is a drift surface by construction.
+rm -rf plugin/starter plugin/scaffold
+cp -R starter plugin/starter
+cp -R scaffold plugin/scaffold
+cp install.sh plugin/install.sh
+chmod +x plugin/install.sh 2>/dev/null || true
+
+# --- 1c. commands ------------------------------------------------------------------------------
+# The standalone installer RENDERS the templates at install time. A plugin cannot: its files are
+# managed and replaced on update. But the slots need no install-time knowledge —
+#   {{MEM}}  is a shell assignment, so it resolves at RUNTIME from the environment
+#   {{USER}} is prose, and the addressee now arrives via the hook's injected context (see
+#            engine/hooks/inject-memory.sh), so the command text does not need a name baked in
+rm -rf plugin/commands
+mkdir -p plugin/commands
+python3 - <<'PYCMD'
+import glob, os, re
+
+MEM_RUNTIME = 'MEM="${RAEMEMBERIT_MEMORY_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memory}"   # resolved at runtime, not baked in'
+
+for src in sorted(glob.glob("protocol/*.md.tmpl")):
+    name = os.path.basename(src)[: -len(".md.tmpl")] + ".md"
+    t = open(src).read()
+    t = re.sub(r'MEM="\{\{MEM\}\}".*', MEM_RUNTIME, t)
+    t = t.replace("{{USER}}", "the user")
+    if "{{" in t:
+        raise SystemExit("unfilled slot left in " + name + " — refusing to ship it")
+    open(os.path.join("plugin/commands", name), "w").write(t)
+
+# setup is plugin-only: a plugin user never runs a shell script, so for them the installer IS a command.
+open("plugin/commands/setup.md", "w").write(open("protocol/setup.md").read())
+PYCMD
+
 # --- 2. hooks.json, with code paths repointed and the shim hook prepended ---------------------
 python3 - <<'PY'
 import json
@@ -141,4 +177,5 @@ PY
 echo "built plugin/ from engine/ + engine/settings.fragment.json"
 echo "  plugin/engine/                $(find plugin/engine -type f | wc -l | tr -d ' ') files"
 echo "  plugin/hooks/hooks.json       $(python3 -c 'import json;print(sum(len(g["hooks"]) for a in json.load(open("plugin/hooks/hooks.json"))["hooks"].values() for g in a))') hook entries"
+echo "  plugin/commands/              $(find plugin/commands -name '*.md' | wc -l | tr -d ' ') commands"
 echo "  plugin/.claude-plugin/        $(python3 -c 'import json;print(len(json.load(open("plugin/.claude-plugin/plugin.json"))["userConfig"]))') declared options"

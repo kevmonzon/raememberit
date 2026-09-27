@@ -1,0 +1,79 @@
+---
+name: memory-reflect
+description: Use at end of session or before context compaction — captures the interaction log and any durable feedback/project/reference memories before they are lost.
+---
+
+# /memory-reflect
+
+Structured session reflection: capture what this conversation produced, before it is gone.
+
+```bash
+MEM="${RAEMEMBERIT_MEMORY_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memory}"   # resolved at runtime, not baked in
+```
+
+If `/learn` has been doing its job, this sweep should be boring — most durable facts are already
+written. What remains is the narrative, which only exists here.
+
+## Steps
+
+### 1. Interaction log
+
+```bash
+engine/mem-write.sh log <topic-slug> <<'EOF'
+# <what this session was about>
+...
+EOF
+```
+
+The helper dates the filename, and **appends** rather than duplicating if a log for the same topic
+already exists today. Use it rather than the Write tool: the corpus sits inside the config directory,
+where Claude Code refuses those tools per file as sensitive paths.
+
+Capture:
+
+- what was asked, and the context
+- decisions reached — **including the ones declined**, and why, so a later session does not
+  re-propose them
+- actions taken and files touched
+- anything surprising or non-obvious, especially where a claim turned out to be wrong
+
+Create it **early** in a session and update as work proceeds, rather than reconstructing it at the
+end. A log written from memory at the end is a summary; one written as you go is evidence.
+
+### 2. Durable memories — write immediately, via `/learn`
+
+Do not hand-write these here. Route each through `/learn`, so the reconcile step and the
+duplicate gate actually run:
+
+- `feedback/` — any correction, confirmed approach, or stated preference
+- `project/` — status changes, new work, architectural decisions, blockers
+- `reference/` — a new external resource, command, or pointer worth keeping
+
+### 3. Skill candidates
+
+If a repeatable workflow emerged — a debugging sequence, a review structure, a tool chain — note
+it in the log as a candidate. Do **not** write the skill now; `/skill-mine` promotes at the second
+recurrence, and one session is an anecdote.
+
+### 4. Index
+
+`mem-write.sh` already rebuilds the indexes and runs the duplicate gate on every write. Run them
+directly only if you edited a memory by hand:
+
+```bash
+bash engine/rebuild-index.sh
+python3 engine/eval/run_eval.py --health --strict-dupes
+```
+
+A `SessionEnd` hook rebuilds the index anyway, but run it here so you see the always-on surface's
+byte count change. That number is the one to watch: everything resident in context dilutes the
+rules that matter.
+
+## Signal words that should trigger a memory write
+
+| Phrase | Type |
+|---|---|
+| "remember", "always do this", "from now on" | `feedback` |
+| "this ticket", "the plan is", "blocked by" | `project` |
+| "the page is at", "the command is", "check X for Y" | `reference` |
+| solved something in 3+ non-obvious steps | skill candidate |

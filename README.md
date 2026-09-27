@@ -101,16 +101,32 @@ exclusions: an excluded file is a blind spot, and a gate with blind spots is dec
 `install.sh` brings the engine and hooks and leaves your commands alone, and guided mode names any
 memory hooks you already have instead of quietly running both. See `docs/ADOPTING.md`.
 
-## Two ways to get the hooks
+## Two routes, one implementation
 
-**As a plugin, inside your config directory.** A plugin placed at `<config>/skills/raememberit/`
-auto-loads as `raememberit@skills-dir` with **no settings entry at all** — no marketplace, no
-`pluginDirs`, no `enabledPlugins`. `plugin/` in this repo is that plugin; copy it there and the hooks
-arrive from it. `claude plugin list` will show it as loaded.
+| | For | Carries |
+|---|---|---|
+| **`plugin/`** | anyone starting fresh | engine, hooks, six commands, the installer, the starter corpus, typed options |
+| **`install.sh`** | adopting into a setup you have customized | the same engine and hooks — and leaves your commands alone |
 
-`plugin/hooks/hooks.json` is **generated** from `engine/settings.fragment.json` by
-`tools/gen-plugin-hooks.sh`, and a test asserts they match — two descriptions of one mechanism is a
-drift surface, and this project has been bitten by that three times.
+They serve genuinely different cases. A plugin's commands are managed files replaced on every update,
+so it cannot carry commands whose text is *yours* — which is exactly the case this kit's own author
+turned out to be.
+
+**The plugin.** Copy `plugin/` to `<config>/skills/raememberit/` and it auto-loads as
+`raememberit@skills-dir` with **no settings entry at all** — no marketplace, no `pluginDirs`, no
+`enabledPlugins`. Then run **`/raememberit:setup`**, which is the installer: it reports what it found,
+names any memory hooks you already have rather than doubling them, shows the one permission rule before
+adding it, seeds the corpus, offers the instruction fragment, and walks the first loop on something real.
+
+**The whole `plugin/` tree is generated** by `tools/build-plugin.sh` from `engine/`, the protocol
+templates and `engine/settings.fragment.json`; `tools/test-plugin.sh` rebuilds it into a temp directory
+and diffs, so editing either side without rebuilding fails. Two descriptions of one mechanism is a drift
+surface and this project has been bitten by it three times.
+
+**The one thing a plugin cannot declare** is a permission rule, and its own install path carries a
+version, so a rule aimed there would die on every update. A `SessionStart` hook places a *wrapper* at
+the version-free `$CLAUDE_PLUGIN_DATA/bin/`, and the rule names that. A copy would not work: every
+engine script finds its siblings with `$(dirname "$0")`.
 
 What a plugin still **cannot** supply: permission rules and settings `env`. So the `Bash(...)` allow
 rule for the write helper, and the knobs, stay in the user's own settings — one entry each, added once.
@@ -194,7 +210,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-146 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+164 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone
