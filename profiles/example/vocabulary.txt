@@ -1,0 +1,14 @@
+# Domain vocabulary for recall query expansion, one group per line, synonyms separated by commas.
+#
+# The recall command expands a query before searching, because every sweep is literal substring
+# matching: searching an acronym will not find a memory that spelled the term out, and vice versa.
+# Listing both directions here is what makes that expansion work for YOUR systems.
+#
+# Keep entries of three characters or fewer out of this file, or mark them: a bare two-character
+# acronym is a substring of hundreds of ordinary words. Measured, one such variant pushed a
+# genuinely relevant memory from rank 4 to rank 74.
+
+auth, authentication, login, signin, sso, saml
+db, database, postgres, migration
+ci, pipeline, build, workflow
+flag, feature-flag, feature flag, toggle

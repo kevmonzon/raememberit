@@ -12,10 +12,29 @@ whose output you must answer to is much harder to skip than a paragraph you must
 
 Prints ranked candidates. Exit 0 always: this informs a verdict, it does not make one.
 """
-import argparse, difflib, os, pathlib, re, sys
+import argparse, os, pathlib, re, sys
 
 CONFIG = pathlib.Path(os.environ.get("CLAUDE_CONFIG_DIR") or (pathlib.Path.home()/".claude"))
-MEM    = pathlib.Path(os.environ.get("MEMKIT_MEMORY_DIR") or (CONFIG/"memory"))
+
+def _resolve_mem():
+    """Mirror of engine/lib/memkit-root.sh — keep the two in step.
+
+    The corpus is a SIBLING of the config dir, not inside it: Claude Code treats any path inside a
+    `.claude` directory as a sensitive file needing per-file approval, and an explicit allow rule
+    does not override that (tested). An in-config corpus therefore means a permission prompt on
+    every memory write. An existing in-config corpus is still honoured, so upgrades do not move
+    anyone's files.
+    """
+    env = os.environ.get("MEMKIT_MEMORY_DIR")
+    if env:
+        return pathlib.Path(env)
+    legacy = CONFIG/"memory"
+    for d in ("feedback", "project", "reference"):
+        if any((legacy/d).glob("*.md")):
+            return legacy
+    return CONFIG.parent/"memkit-memory"
+
+MEM = _resolve_mem()
 DIRS   = ["feedback", "project", "reference"]
 
 def load():
@@ -29,11 +48,30 @@ def load():
 
 def norm(s): return re.sub(r"[^a-z0-9 ]", " ", s.lower())
 
+def toks(s):
+    """Content words only. Short words carry no signal and drag every pair toward the mean."""
+    return {w for w in norm(s).split() if len(w) >= 4}
+
+def similarity(a, b):
+    """Token overlap (Jaccard), NOT character similarity.
+
+    Character-level SequenceMatcher scores any two English sentences around 0.33 purely on shared
+    letters and comparable length — measured against this very corpus, where unrelated rules all
+    landed at 0.33 with ZERO term overlap. That noise floor sat above the candidate threshold, so
+    every memory looked like a candidate. Token overlap separates the cases: unrelated prose scores
+    near zero, a genuine restatement scores high.
+    """
+    ta, tb = toks(a), toks(b)
+    if not ta or not tb:
+        return 0.0
+    return len(ta & tb) / len(ta | tb)
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("terms", nargs="*", help="key nouns of the new fact")
     ap.add_argument("--desc", default="", help="the description you were about to write")
-    ap.add_argument("--threshold", type=float, default=0.45)
+    ap.add_argument("--threshold", type=float, default=0.30,
+                    help="token-overlap ratio above which a candidate is called a likely duplicate")
     a = ap.parse_args()
     if not a.terms and not a.desc:
         ap.error("give some terms, or --desc")
@@ -47,14 +85,14 @@ def main():
     for d in docs:
         hits = [t for t in a.terms if norm(t) in norm(d["body"])]
         dhits = [t for t in a.terms if norm(t) in norm(d["desc"])]
-        sim = difflib.SequenceMatcher(None, norm(a.desc), norm(d["desc"])).ratio() if a.desc else 0.0
+        sim = similarity(a.desc, d["desc"]) if a.desc else 0.0
         # description matches and description similarity dominate: a memory whose DESCRIPTION
         # covers the fact is the one that will be retrieved instead of your new file.
         score = 2.0*len(dhits) + 1.0*len(hits) + 3.0*sim
         # A single body-term match is noise: in a corpus of a few hundred memories almost
-        # everything shares one common noun. Require a DESCRIPTION hit, real description
-        # similarity, or at least two distinct body terms before calling something a candidate.
-        if len(dhits) >= 1 or sim >= 0.25 or len(hits) >= 2:
+        # everything shares one common noun. Require a DESCRIPTION hit, real token overlap, or at
+        # least two distinct body terms before calling something a candidate.
+        if len(dhits) >= 1 or sim >= 0.15 or len(hits) >= 2:
             scored.append((score, sim, len(hits), len(dhits), d))
     scored.sort(key=lambda r: -r[0])
 

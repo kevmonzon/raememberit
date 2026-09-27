@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "note": "Retrieval queries for the starter corpus. Replace and EXTEND these with the lookups you actually make: the point is to encode your real questions, then notice when a corpus change makes one stop resolving. Never edit an expectation to turn a run green \u2014 that converts the only honest signal here into decoration. `mode: any` passes when an expected memory lands in the top 3; `none` asserts a query finds NOTHING, which is how false positives get caught.",
+  "queries": [
+    {
+      "id": "effect-not-wiring",
+      "category": "verification",
+      "query": "verify effect",
+      "variants": [
+        "verify effect",
+        "actually works",
+        "runtime effect",
+        "propagated but no effect"
+      ],
+      "expect": [
+        "feedback/verify-effect-not-just-wiring.md"
+      ],
+      "mode": "any"
+    },
+    {
+      "id": "false-green-tail",
+      "category": "verification",
+      "query": "tail exit code",
+      "variants": [
+        "tail",
+        "exit code",
+        "build OK but failed",
+        "pipeline exit status"
+      ],
+      "expect": [
+        "feedback/verification-tail-masks-failure.md"
+      ],
+      "mode": "any"
+    },
+    {
+      "id": "read-full-output",
+      "category": "verification",
+      "query": "full build output",
+      "variants": [
+        "full output",
+        "warning scrolled past",
+        "ignored config",
+        "grep the log first"
+      ],
+      "expect": [
+        "feedback/read-full-build-output-not-just-the-tail.md"
+      ],
+      "mode": "any"
+    },
+    {
+      "id": "doc-is-a-claim",
+      "category": "trust",
+      "query": "documented invariant",
+      "variants": [
+        "documented invariant",
+        "marked verified",
+        "trust the readme",
+        "measure it live"
+      ],
+      "expect": [
+        "feedback/documented-invariant-is-a-claim.md"
+      ],
+      "mode": "any"
+    },
+    {
+      "id": "regression-proof",
+      "category": "testing",
+      "query": "regression test",
+      "variants": [
+        "regression test",
+        "stash the fix",
+        "watch it fail",
+        "prove the test binds"
+      ],
+      "expect": [
+        "feedback/prove-regression-test-fails-without-the-fix.md"
+      ],
+      "mode": "any"
+    },
+    {
+      "id": "redundant-tests",
+      "category": "testing",
+      "query": "duplicate test coverage",
+      "variants": [
+        "duplicate test",
+        "already covered",
+        "restate coverage",
+        "redundant assertion"
+      ],
+      "expect": [
+        "feedback/dont-restate-existing-test-coverage.md"
+      ],
+      "mode": "any"
+    },
+    {
+      "id": "consequence-first",
+      "category": "communication",
+      "query": "one simple sentence",
+      "variants": [
+        "one simple sentence",
+        "explain simply",
+        "consequence not mechanism",
+        "what breaks without it"
+      ],
+      "expect": [
+        "feedback/lead-with-consequence-not-mechanism.md"
+      ],
+      "mode": "any"
+    },
+    {
+      "id": "reverted-edit",
+      "category": "collaboration",
+      "query": "reverted my edit",
+      "variants": [
+        "reverted",
+        "overrode my change",
+        "re-apply",
+        "user undid it"
+      ],
+      "expect": [
+        "feedback/respect-reverted-edits.md"
+      ],
+      "mode": "any"
+    },
+    {
+      "id": "not-impossible",
+      "category": "investigation",
+      "query": "impossible",
+      "variants": [
+        "impossible",
+        "cannot be done",
+        "did not find it",
+        "diminishing returns"
+      ],
+      "expect": [
+        "feedback/dont-conclude-impossible-prematurely.md"
+      ],
+      "mode": "any"
+    },
+    {
+      "id": "shell-dialect",
+      "category": "environment",
+      "query": "zsh",
+      "variants": [
+        "zsh",
+        "PIPESTATUS",
+        "word splitting",
+        "shell dialect"
+      ],
+      "expect": [
+        "feedback/shell-dialect-traps.md"
+      ],
+      "mode": "any"
+    },
+    {
+      "id": "agent-blind-spots",
+      "category": "orchestration",
+      "query": "subagent blind spot",
+      "variants": [
+        "subagent",
+        "locally correct",
+        "coordinator",
+        "blind spot"
+      ],
+      "expect": [
+        "feedback/coordinator-checks-agent-blind-spots.md"
+      ],
+      "mode": "any"
+    },
+    {
+      "id": "no-such-topic",
+      "category": "false-positive-guard",
+      "query": "quantum teapot calibration",
+      "variants": [
+        "quantum teapot calibration",
+        "zzqq nonexistent subject"
+      ],
+      "expect": [],
+      "mode": "none"
+    }
+  ]
+}

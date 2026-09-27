@@ -1,7 +1,11 @@
 # Memory
 
-A durable, portable memory corpus. Plain markdown; no database, no daemon. It survives a
-`cp -r` of the config directory.
+A durable, portable memory corpus. Plain markdown; no database, no daemon. It survives a `cp -r`.
+
+It lives **beside** the Claude Code config directory, not inside it — Claude Code treats any path
+inside a `.claude` directory as a sensitive file requiring per-file approval, and an allow rule does
+not override that, so an in-config corpus would prompt on every write. The path is published as
+`$MEMKIT_MEMORY_DIR`.
 
 ## Two tiers, and why
 

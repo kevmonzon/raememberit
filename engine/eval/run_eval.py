@@ -23,7 +23,26 @@ from difflib import SequenceMatcher
 # config but does NOT change $HOME, so hardcoding ~/.claude would make an isolated run read
 # the default corpus instead of the sandboxed one.
 CONFIG = pathlib.Path(os.environ.get("CLAUDE_CONFIG_DIR") or (pathlib.Path.home()/".claude"))
-MEM    = pathlib.Path(os.environ.get("MEMKIT_MEMORY_DIR") or (CONFIG/"memory"))
+
+def _resolve_mem():
+    """Mirror of engine/lib/memkit-root.sh — keep the two in step.
+
+    The corpus is a SIBLING of the config dir, not inside it: Claude Code treats any path inside a
+    `.claude` directory as a sensitive file needing per-file approval, and an explicit allow rule
+    does not override that (tested). An in-config corpus therefore means a permission prompt on
+    every memory write. An existing in-config corpus is still honoured, so upgrades do not move
+    anyone's files.
+    """
+    env = os.environ.get("MEMKIT_MEMORY_DIR")
+    if env:
+        return pathlib.Path(env)
+    legacy = CONFIG/"memory"
+    for d in ("feedback", "project", "reference"):
+        if any((legacy/d).glob("*.md")):
+            return legacy
+    return CONFIG.parent/"memkit-memory"
+
+MEM = _resolve_mem()
 DIRS   = ["feedback", "project", "reference"]
 NATIVE = sorted((CONFIG/"projects").glob("*/memory"))
 QUERIES = pathlib.Path(os.environ.get("MEMKIT_QUERIES") or (MEM/"eval/queries.json"))

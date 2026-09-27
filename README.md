@@ -84,6 +84,38 @@ disclosure it was written to prevent — so it is not in here.
 The gate treats **scanning zero files as an error, not a pass**, and carries no file
 exclusions: an excluded file is a blind spot, and a gate with blind spots is decoration.
 
+## Install
+
+```bash
+./install.sh                              # into ${CLAUDE_CONFIG_DIR:-~/.claude}
+./install.sh --profile example --user Alex
+./install.sh --dry-run                    # say what would change, change nothing
+```
+
+Idempotent: re-run it to upgrade. It **merges** hooks into an existing settings file rather than
+replacing it, never overwrites an existing corpus, and never touches credentials.
+
+### Where the corpus lives, and why it is not in the config directory
+
+Beside it — the path is published as `env.MEMKIT_MEMORY_DIR`. Claude Code classifies any path inside
+a `.claude` directory as a **sensitive file** requiring per-file approval, and an explicit
+`Edit(<config>/memory/**)` allow rule does **not** override that gate (tested; still refused). A
+corpus inside the config directory therefore means a permission prompt on every single memory write
+for anyone not running an auto-approve mode. A sibling directory keeps the corpus isolated per
+config directory — so sandboxes still work — without paying that toll. An existing in-config corpus
+is honoured on upgrade, with a warning, so nobody's files get moved.
+
+## Tests
+
+```bash
+tools/test-all.sh
+```
+
+53 assertions across the sanitization gate, the duplicate-prevention loop, and a full
+install-then-reinstall cycle — plus a frozen retrieval baseline for the shipped starter corpus
+(`starter/baseline.json`: literal 8/12, expanded 12/12, which is the measured value of the recall
+command's query-expansion step).
+
 ## Testing in isolation
 
 Point `CLAUDE_CONFIG_DIR` at a throwaway directory and Claude Code relocates its entire config
