@@ -10,6 +10,8 @@
 #                                                  # permission rule and fragment only
 #   ./install.sh --as-plugin                       # place plugin/ at <config>/skills/raememberit/
 #                                                  # too — the plugin route, no marketplace needed
+#   ./install.sh --hooks-from-plugin               # engine in the config dir (so anything pointing at
+#                                                  # it keeps working), hooks from a generated plugin
 #
 # GUIDED MODE is on by default for a fresh interactive install and off otherwise (a re-run, or
 # no terminal). It is the onboarding: someone who has to read a document first is someone who
@@ -34,7 +36,7 @@ set -euo pipefail
 
 SRC="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-USERNAME=""; PERSONA=""; VOCAB=""; FORCE=0; FORCECMD=0; DRY=0; GUIDED=auto; PLUGINMODE=0; ASPLUGIN=0
+USERNAME=""; PERSONA=""; VOCAB=""; FORCE=0; FORCECMD=0; DRY=0; GUIDED=auto; PLUGINMODE=0; ASPLUGIN=0; HFP=0
 SHIM=""   # in --plugin mode, the discovered stable path of the write helper
 
 say()  { printf '\033[1;36m▸ %s\033[0m\n' "$*"; }
@@ -95,6 +97,11 @@ while [ $# -gt 0 ]; do
     # marketplace: distribution is this script, and the install path carries NO version, so the write
     # helper needs no wrapper — the rule can name the engine directly and still never move.
     --as-plugin)  PLUGINMODE=1; ASPLUGIN=1; shift ;;
+    # --hooks-from-plugin: the THIRD arrangement, and the one an adopted setup actually ends up in.
+    # The engine stays in the config dir — anything referencing it keeps working, which matters because
+    # hand-edited commands hardcode those paths — while the HOOKS come from a small generated plugin
+    # instead of from settings.json. Everything else is the standalone route unchanged.
+    --hooks-from-plugin) HFP=1; shift ;;
     -h|--help)    sed -n '2,20p' "$0"; exit 0 ;;
     *)            die "unknown option: $1" ;;
   esac
@@ -117,8 +124,37 @@ fi
 # vocabulary and extra rules. It was built, documented, tested — and used by nobody, because one
 # person's configuration is a handful of VALUES, not a bundle. Values are what this takes now.
 say "Configuration"
-PUSER="${USERNAME:-you}"
-ok "addressee \"$PUSER\""
+# WHY THESE ARE REMEMBERED. This installer tells you to re-run it any time, and it upgrades in place. But
+# --user, --persona and --vocabulary were only ever read from the command line, so a re-run WITHOUT them
+# silently re-rendered every command with the default addressee and dropped the persona from the
+# instruction fragment. Measured: `--user Testee` then a bare re-run rewrote "Testee" to "you" in two
+# commands and reported it only as "2 updated". The cause — a forgotten flag — was invisible.
+#
+# So the chosen values are recorded, and a re-run that does not name them inherits them. An explicitly
+# passed flag still wins, which is how you change your mind.
+CFGFILE="$TARGET/raememberit/.config"
+cfgget() { [ -f "$CFGFILE" ] || return 0; sed -n "s|^$1=||p" "$CFGFILE" | tail -1; }
+
+REMEMBERED_USER="$(cfgget user)"
+REMEMBERED_PERSONA="$(cfgget persona)"
+REMEMBERED_VOCAB="$(cfgget vocabulary)"
+
+if [ -n "$USERNAME" ]; then PUSER="$USERNAME"; USERSRC="given"
+elif [ -n "$REMEMBERED_USER" ]; then PUSER="$REMEMBERED_USER"; USERSRC="remembered from the last run"
+else PUSER="you"; USERSRC="default"; fi
+# A REMEMBERED path that has since vanished must not be fatal. A GIVEN one must: naming a file that is
+# not there is a typo, and guessing past it would install something other than what was asked for. But
+# inheriting a stale path and dying on it would wedge the installer PERMANENTLY — the record keeps the
+# bad path, so every future run fails the same way and the remedy is invisible. Warn, drop, carry on.
+if [ -z "$PERSONA" ] && [ -n "$REMEMBERED_PERSONA" ]; then
+  if [ -f "$REMEMBERED_PERSONA" ]; then PERSONA="$REMEMBERED_PERSONA"
+  else warn "remembered persona file is gone, ignoring it: $REMEMBERED_PERSONA"; fi
+fi
+if [ -z "$VOCAB" ] && [ -n "$REMEMBERED_VOCAB" ]; then
+  if [ -f "$REMEMBERED_VOCAB" ]; then VOCAB="$REMEMBERED_VOCAB"
+  else warn "remembered vocabulary file is gone, ignoring it: $REMEMBERED_VOCAB"; fi
+fi
+ok "addressee \"$PUSER\" ($USERSRC)"
 if [ -n "$PERSONA" ]; then
   [ -f "$PERSONA" ] || die "no such persona file: $PERSONA"
   ok "persona from $PERSONA"
@@ -238,6 +274,40 @@ else
   ok "engine/ installed (hooks resolve via \${CLAUDE_CONFIG_DIR:-\$HOME/.claude})"
 fi
 
+# Record the choices so the next run inherits them rather than silently reverting to defaults.
+if [ "$DRY" = 1 ]; then printf '  would: record the addressee and optional file paths in %s\n' "$CFGFILE"
+elif [ -d "$TARGET/raememberit" ]; then
+  { printf 'user=%s\n' "$PUSER"
+    [ -n "$PERSONA" ] && printf 'persona=%s\n' "$PERSONA"
+    [ -n "$VOCAB" ]   && printf 'vocabulary=%s\n' "$VOCAB"; } > "$CFGFILE"
+fi
+
+# ââ the hooks-only plugin ââââââââââââââââââââââââââââââââââ
+# WHY THIS NEEDS NO REWRITING AT ALL, and why that makes the mode cheap: the settings fragment's commands
+# are ALREADY ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/... , which is exactly where
+# this mode leaves the engine. So hooks.json is the fragment's own hooks, verbatim. Nothing is
+# transformed, so nothing can be transformed wrongly â and because it is generated here from the single
+# fragment rather than committed, there is no third tree to drift.
+#
+# It ships NO userConfig. Configuration here arrives through settings `env`, which the options bridge
+# gives precedence over any option â so a declared option would be silently shadowed, and a knob that
+# turns nothing is worse than no knob. Same reason the manifest does not pretend to declare `permissions`.
+#
+# And NO place-shim: the engine's path here carries no version, so that wrapper would be a moving part
+# solving a problem this mode does not have.
+if [ "$HFP" = 1 ]; then
+  say "Hooks plugin"
+  SKILLDIR="$TARGET/skills/raememberit"
+  if [ "$DRY" = 1 ]; then
+    printf '  would: generate %s/{.claude-plugin/plugin.json,hooks/hooks.json} from the settings fragment\n' "$SKILLDIR"
+    [ -d "$SKILLDIR" ] && printf '  would: REPLACE the generated files in the existing %s\n' "$SKILLDIR"
+  else
+    mkdir -p "$SKILLDIR/.claude-plugin" "$SKILLDIR/hooks"
+    python3 "$SRC/tools/gen-hooks-only-plugin.py" "$SRC/engine/settings.fragment.json" "$SKILLDIR"
+    ok "loads as raememberit@skills-dir with no settings entry; no engine, no commands, no options inside"
+  fi
+fi
+
 # ── commands: fill the slot ─────────────────────────────────────────────────────────
 say "Corpus"
 # INSIDE the config dir, deliberately: the whole directory stays one portable, copy-pasteable unit.
@@ -288,7 +358,7 @@ else
 # whatever version they first installed. With it, upgrades flow to untouched files and stop at edited
 # ones, which is the behaviour a package manager has for config files and for the same reason.
 MANIFEST="$TARGET/raememberit/.installed-commands"
-n=0; skipped=0; updated=0
+n=0; skipped=0; updated=0; unchanged=0
 [ "$DRY" = 0 ] && : > "$MANIFEST.new"
 for t in "$SRC/protocol"/*.md.tmpl; do
   [ -e "$t" ] || continue
@@ -317,6 +387,9 @@ for t in "$SRC/protocol"/*.md.tmpl; do
       else cp "$rendered" "$dest"; printf '%s %s\n' "$newsum" "$b" >> "$MANIFEST.new"; fi
       [ "$action" = update ] && updated=$((updated+1)) || n=$((n+1)) ;;
     current)
+      # Counted, not silent. "0 installed · 0 updated · 2 left alone" on a config holding five commands
+      # is a report that does not add up, and a reader cannot tell whether the other three were touched.
+      unchanged=$((unchanged+1))
       [ "$DRY" = 0 ] && printf '%s %s\n' "$newsum" "$b" >> "$MANIFEST.new" ;;
     skip-edited)
       # Save the version we WOULD have written, so the comparison is a runnable command rather than a
@@ -348,7 +421,7 @@ if [ "$FORCECMD" = 1 ] && [ "$skipped" -gt 0 ]; then
   n=$((n+skipped)); skipped=0
 fi
 [ "$DRY" = 0 ] && mv "$MANIFEST.new" "$MANIFEST"
-ok "commands: $n installed · $updated updated · $skipped left alone (yours)"
+ok "commands: $n installed · $updated updated · $unchanged already current · $skipped left alone (yours)"
 [ "$skipped" -gt 0 ] && printf '    Your edits are kept. Pass --force-commands to take the shipped versions instead.\n'
 fi
 
@@ -372,7 +445,7 @@ say "Hooks"
 # behind: proceeding would wire seven groups into settings while the plugin supplies the same ones.
 # The installer already declines to clobber a command you have edited; declining to build a knowingly
 # doubled configuration is the same principle.
-if [ "$PLUGINMODE" = 0 ] && [ -f "$TARGET/skills/raememberit/hooks/hooks.json" ] && [ "$FORCE" != 1 ]; then
+if [ "$PLUGINMODE" = 0 ] && [ "$HFP" = 0 ] && [ -f "$TARGET/skills/raememberit/hooks/hooks.json" ] && [ "$FORCE" != 1 ]; then
   warn "a raememberit PLUGIN is also installed at $TARGET/skills/raememberit"
   warn "It supplies these same hooks. Wiring them into settings as well makes every hook fire TWICE."
   warn ""
@@ -383,14 +456,17 @@ if [ "$PLUGINMODE" = 0 ] && [ -f "$TARGET/skills/raememberit/hooks/hooks.json" ]
   die  "refusing to create a doubled configuration. Pass --force to do it anyway."
 fi
 if [ "$DRY" = 1 ]; then printf '  would: merge hook wiring into %s/settings.json\n' "$TARGET"; else
-python3 - "$SRC/engine/settings.fragment.json" "$TARGET/settings.json" "$MEM" "$PLUGINMODE" "$SHIM" <<'PY'
+python3 - "$SRC/engine/settings.fragment.json" "$TARGET/settings.json" "$MEM" "$PLUGINMODE" "$SHIM" "$HFP" <<'PY'
 import json, os, sys
 frag_p, set_p, mem = sys.argv[1], sys.argv[2], sys.argv[3]
 plugin_mode = sys.argv[4] == "1"
 shim = sys.argv[5] if len(sys.argv) > 5 else ""
+hooks_from_plugin = len(sys.argv) > 6 and sys.argv[6] == "1"
+# Either arrangement means a plugin supplies the hooks, so settings must carry none of ours.
+plugin_owns_hooks = plugin_mode or hooks_from_plugin
 # Plugin mode wires no hooks, so it must not REQUIRE the standalone wiring fragment — which the
 # plugin deliberately does not ship, because a plugin user never merges it.
-frag = {"hooks": {}} if plugin_mode else json.load(open(frag_p))
+frag = {"hooks": {}} if plugin_owns_hooks else json.load(open(frag_p))
 cur  = json.load(open(set_p)) if os.path.exists(set_p) else {}
 hooks = cur.setdefault("hooks", {})
 MARK = "/raememberit/engine/hooks/"
@@ -405,7 +481,7 @@ replaced = added = kept = removed = 0
 # groups sitting there, and the plugin's nine arrive alongside them. Measured: everything fires twice.
 # That is the exact failure this installer exists to warn about, reachable through its own flags — so
 # plugin mode REMOVES raememberit's own hook groups. Anyone else's are untouched.
-if plugin_mode:
+if plugin_owns_hooks:
     for ev in list(hooks.keys()):
         keep = [g for g in hooks[ev] if not is_ours(g)]
         removed += len(hooks[ev]) - len(keep)
@@ -414,7 +490,7 @@ if plugin_mode:
         else:
             del hooks[ev]
 
-for ev, groups in ([] if plugin_mode else frag["hooks"].items()):
+for ev, groups in ([] if plugin_owns_hooks else frag["hooks"].items()):
     existing = hooks.get(ev, [])
     mine  = [g for g in existing if is_ours(g)]
     yours = [g for g in existing if not is_ours(g)]
@@ -452,7 +528,7 @@ for r in rules:
         allow.append(r); new_rules += 1
 
 json.dump(cur, open(set_p, "w"), indent=2); open(set_p, "a").write("\n")
-if plugin_mode:
+if plugin_owns_hooks:
     if removed:
         print(f"  \033[1;32m✓\033[0m {removed} raememberit hook group(s) REMOVED from settings — the plugin\n      supplies them, and both together would fire every hook twice")
     else:

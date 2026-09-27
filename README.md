@@ -103,10 +103,18 @@ memory hooks you already have instead of quietly running both. See `docs/ADOPTIN
 
 ## Two routes, one implementation
 
-| | For | Carries |
-|---|---|---|
-| **`./install.sh --as-plugin`** | anyone starting fresh | places `plugin/` at `<config>/skills/raememberit/` — engine, hooks, six commands, starter corpus, typed options |
-| **`./install.sh`** | adopting into a setup you have customized | the same engine and hooks — and leaves your commands alone |
+| | For | Where the engine lives | Where the hooks come from |
+|---|---|---|---|
+| **`./install.sh --as-plugin`** | starting fresh | inside the plugin | the plugin |
+| **`./install.sh`** | adopting into a customized setup | `<config>/raememberit/engine/` | `settings.json` |
+| **`./install.sh --hooks-from-plugin`** | a customized setup that would rather not carry hook entries in settings | `<config>/raememberit/engine/` | a small generated plugin |
+
+The third row is not a variant for its own sake. **Hand-edited commands hardcode the config-dir engine
+paths**, so any route that moves the engine breaks them *silently* — they grep nothing and report a
+confident absence. That mode keeps the engine still while moving only the hooks, and the plugin it
+generates needs no path rewriting at all: the settings fragment's commands already point exactly where
+that mode leaves the engine, so they are copied verbatim. Nothing is transformed, so nothing can be
+transformed wrongly.
 
 Both routes are **this script**. There is a `marketplace.json` as well, but it exists so
 `tools/test-lifecycle.sh` can run a real install/update/uninstall cycle — the only way to prove an update
@@ -227,7 +235,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-197 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+218 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

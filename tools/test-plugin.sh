@@ -454,6 +454,114 @@ sys.exit(0 if len(b) == 2 and all(os.path.isfile(x) for x in paths) else 1)' \
   || bad "a fresh --as-plugin install did not add two resolving Bash rules"
 rm -rf "$(dirname "$t9")"
 
+echo "== --hooks-from-plugin: engine in the config dir, hooks from a plugin =="
+# The THIRD arrangement, and the one an adopted setup ends up in. Hand-edited commands hardcode
+# <config>/raememberit/engine/... paths, so a route that moves the engine breaks them SILENTLY — they
+# grep nothing and report confident emptiness. This mode exists so that arrangement is supported.
+th="$(mktemp -d)/.claude"
+bash install.sh --hooks-from-plugin --config-dir "$th" --no-guided --user Tester >/dev/null 2>&1 \
+  && ok "--hooks-from-plugin completes" || bad "--hooks-from-plugin failed"
+[ -f "$th/raememberit/engine/mem-write.sh" ] && ok "engine stays in the config dir" \
+                                             || bad "engine is not in the config dir"
+[ -f "$th/skills/raememberit/hooks/hooks.json" ] && ok "a plugin is generated" || bad "no plugin generated"
+[ -d "$th/skills/raememberit/engine" ]   && bad "the generated plugin ships an engine (it must not)" \
+                                         || ok "the generated plugin ships no engine"
+[ -d "$th/skills/raememberit/commands" ] && bad "the generated plugin ships commands (it must not)" \
+                                         || ok "the generated plugin ships no commands"
+# No userConfig: configuration here comes from settings `env`, which the bridge ranks ABOVE any option,
+# so a declared option would be silently shadowed — a knob that turns nothing.
+python3 -c 'import json,sys
+m=json.load(open("'"$th"'/skills/raememberit/.claude-plugin/plugin.json"))
+sys.exit(1 if m.get("userConfig") else 0)' \
+  && ok "declares no userConfig (settings env would shadow it)" || bad "declares options that env shadows"
+# Hook commands are config-dir relative ON PURPOSE here, and every one must resolve.
+python3 -c 'import json,os,sys
+d=json.load(open("'"$th"'/skills/raememberit/hooks/hooks.json"))
+c=[h["command"] for a in d["hooks"].values() for g in a for h in g["hooks"]]
+if not c: sys.exit(1)
+if any("PLUGIN_ROOT" in x for x in c): sys.exit(2)
+if any("place-shim" in x for x in c): sys.exit(3)
+bad=[x for x in c if not os.path.exists(x.replace("${CLAUDE_CONFIG_DIR:-$HOME/.claude}", "'"$th"'"))]
+sys.exit(4 if bad else 0)'
+case $? in
+  0) ok "every hook command is config-dir relative, resolves, and there is no place-shim" ;;
+  1) bad "the generated hooks.json has no hook commands" ;;
+  2) bad "a hook command is PLUGIN_ROOT-relative — wrong for this arrangement" ;;
+  3) bad "ships place-shim, which this arrangement does not need" ;;
+  4) bad "a hook command does not resolve to an existing file" ;;
+esac
+python3 -c 'import json,sys
+d=json.load(open("'"$th"'/settings.json")); sys.exit(0 if not d.get("hooks") else 1)' \
+  && ok "settings carry no hooks — the plugin owns them" || bad "hooks were wired into settings too"
+python3 -c 'import json,sys
+d=json.load(open("'"$th"'/settings.json")); a=d.get("permissions",{}).get("allow",[])
+sys.exit(0 if any("/raememberit/engine/mem-write.sh" in r for r in a) else 1)' \
+  && ok "the rule names the CONFIG-DIR engine, which is what commands reference" \
+  || bad "the rule does not name the config-dir engine"
+[ -d "$th/commands" ] && ok "commands are installed (unlike --as-plugin)" || bad "no commands installed"
+
+# Migration: a config wired standalone must have its settings hooks stripped, not doubled.
+bash install.sh --config-dir "$th" --no-guided --force >/dev/null 2>&1
+n_before=$(python3 -c 'import json;d=json.load(open("'"$th"'/settings.json"));print(sum(len(v) for v in d.get("hooks",{}).values()))')
+bash install.sh --hooks-from-plugin --config-dir "$th" --no-guided >/dev/null 2>&1
+python3 -c 'import json,sys
+d=json.load(open("'"$th"'/settings.json"))
+c=[h["command"] for a in d.get("hooks",{}).values() for g in a for h in g["hooks"]]
+sys.exit(0 if not any("raememberit" in x for x in c) else 1)' \
+  && ok "migrating from standalone strips the settings hooks ($n_before were there)" \
+  || bad "migrating from standalone left the hooks in settings: everything would double"
+rm -rf "$(dirname "$th")"
+
+echo "== a re-run must not silently discard the configuration =="
+# THE FOOTGUN. The installer says to re-run it any time; --user was only read from the command line, so a
+# bare re-run re-rendered every command with the default addressee and reported it merely as "2 updated".
+tc="$(mktemp -d)/.claude"
+bash install.sh --config-dir "$tc" --no-guided --user Tester >/dev/null 2>&1
+grep -q 'Tester' "$tc/commands/learn.md" && ok "the addressee is rendered into the commands" \
+                                        || bad "the addressee was not rendered"
+out_c="$(bash install.sh --config-dir "$tc" --no-guided 2>&1)"
+grep -q 'Tester' "$tc/commands/learn.md" \
+  && ok "a re-run WITHOUT --user keeps the addressee" \
+  || bad "a bare re-run silently reverted the addressee to the default"
+printf '%s' "$out_c" | grep -q 'remembered from the last run' \
+  && ok "and says where the value came from" || bad "does not say the value was remembered"
+# An explicit flag still wins — remembering must not become a cage.
+bash install.sh --config-dir "$tc" --no-guided --user Other >/dev/null 2>&1
+grep -q 'Other' "$tc/commands/learn.md" && ok "an explicit --user still overrides what was remembered" \
+                                        || bad "--user no longer overrides the remembered value"
+# A persona is appended to a fragment that is rewritten every run, so it had the same defect.
+pf="$(mktemp)"; printf '## Persona\nBe terse.\n' > "$pf"
+bash install.sh --config-dir "$tc" --no-guided --persona "$pf" >/dev/null 2>&1
+bash install.sh --config-dir "$tc" --no-guided >/dev/null 2>&1
+grep -q 'Be terse' "$tc/raememberit/INSTRUCTIONS-fragment.md" \
+  && ok "a re-run keeps the persona too" || bad "a bare re-run dropped the persona from the fragment"
+rm -f "$pf"
+# A remembered path that has since vanished must not wedge the installer: the record keeps it, so dying
+# on it would fail every future run identically with no visible remedy. Warn, drop, carry on. A GIVEN
+# path still dies, because naming a file that is not there is a typo.
+out_gone="$(bash install.sh --config-dir "$tc" --no-guided 2>&1)"; rc_gone=$?
+[ "$rc_gone" = "0" ] && ok "a re-run survives a remembered persona file that was deleted" \
+                     || bad "a deleted persona file wedges every future run"
+printf '%s' "$out_gone" | grep -q 'remembered persona file is gone' \
+  && ok "and says it is ignoring it" || bad "drops the persona silently"
+bash install.sh --config-dir "$tc" --no-guided --persona /nonexistent/persona.md >/dev/null 2>&1 \
+  && bad "an explicitly given missing persona file was accepted" \
+  || ok "an explicitly GIVEN missing persona file still fails"
+
+echo "== the command tally accounts for every file =="
+# "0 installed · 0 updated · 2 left alone" on a config holding five commands is a report that does not
+# add up, and a reader cannot tell whether the other three were touched.
+out_t="$(bash install.sh --config-dir "$tc" --no-guided 2>&1 | grep 'commands:')"
+printf '%s' "$out_t" | grep -q 'already current' \
+  && ok "unchanged commands are counted, not silent" || bad "unchanged commands are still unreported"
+tot=$(python3 -c 'import re,sys
+m=re.findall(r"(\d+) (?:installed|updated|already current|left alone)", """'"$out_t"'""")
+print(sum(int(x) for x in m))')
+have=$(ls "$tc/commands"/*.md 2>/dev/null | wc -l | tr -d ' ')
+[ "$tot" = "$have" ] && ok "the numbers add up to the $have files present" \
+                     || bad "the tally sums to $tot but $have command files exist"
+rm -rf "$(dirname "$tc")"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" = "0" ]
