@@ -70,7 +70,7 @@ uninstalled.
 before trusting it:
 
 ```bash
-tools/test-sanitize-scan.sh      # 14 assertions
+tools/test-sanitize-scan.sh      # the gate's own self-test
 tools/install-hooks.sh           # wire it as pre-commit
 tools/sanitize-scan.sh           # scan the tree
 ```
@@ -142,9 +142,20 @@ tools/test-all.sh
 ```
 
 87 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
-schema enforcement, and a full install-then-reinstall-then-uninstall cycle — plus a frozen
-retrieval baseline for the shipped starter corpus (`starter/baseline.json`: literal 8/12,
-expanded 12/12, which is the measured value of the recall command's query-expansion step).
+schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
+
+Plus two things that check the project against itself rather than against an expectation someone
+typed:
+
+- **`starter/baseline.json`** — a frozen retrieval score for the shipped starter corpus: literal
+  8/12, expanded 12/12. That gap *is* the measured value of the recall command's query-expansion
+  step, and a change to any starter rule's description that breaks retrieval fails the run.
+- **`tools/test-docs.sh`** — a documentation-consistency check. It verifies that the hook table in
+  this README still matches the wiring it was generated from, that no protocol template has lost its
+  corpus slot, that the installed git hook matches its source, that the baseline still describes a
+  fresh install, and **that the assertion count in the sentence above is still true.** Two numbers in
+  these docs were already stale when it was written; a hand-typed figure rots within days, so where
+  one cannot be generated it is at least verified.
 
 ## Testing in isolation
 

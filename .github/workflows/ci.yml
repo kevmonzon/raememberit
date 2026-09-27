@@ -1,0 +1,41 @@
+name: ci
+on: [push, pull_request]
+
+# GATE STRENGTH: the full denylist carries internal vocabulary and is therefore not in this
+# repository — publishing it would be the disclosure it exists to prevent. CI runs the public,
+# shape-only list by default. To run the full gate, store the pattern file as the repository secret
+# RAEMEMBERIT_DENYLIST and it is used instead.
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write the private denylist if one was provided
+        if: ${{ secrets.RAEMEMBERIT_DENYLIST != '' }}
+        run: printf '%s\n' "${{ secrets.RAEMEMBERIT_DENYLIST }}" > .denylist.local.txt
+
+      - name: Toolchain
+        run: |
+          jq --version
+          python3 -V
+          bash --version | head -1
+
+      # Everything: the sanitization gate, the duplicate-prevention loop, the write helper's schema
+      # enforcement, a full install/reinstall/uninstall cycle, and the documentation-consistency
+      # check. Running only the gate — as this workflow previously did — would have let the other
+      # four suites rot unnoticed.
+      - name: All tests
+        run: tools/test-all.sh
+
+  # The scripts target bash 3.2, because that is what macOS ships. Ubuntu runs bash 5, so a 3.2-only
+  # break (mapfile, associative arrays) would pass CI and fail on the machines this is for. A macOS
+  # runner is the only honest check of that.
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm the shell really is bash 3.2
+        run: /bin/bash --version | head -1
+      - name: All tests, under the shell this targets
+        run: /bin/bash tools/test-all.sh
