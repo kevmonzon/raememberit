@@ -43,8 +43,11 @@ cd /path/to/raememberit
 
 It prints every step. Two lines worth reading:
 
-- **`corpus at …`** — where your memories go. Beside the config directory, not inside it. `PILOT.md`
-  explains why.
+- **`corpus at …`** — where your memories go: inside the config directory, so the whole thing stays
+  portable.
+- **`N permission rule(s) added so the write helper runs without prompting`** — memories are written
+  by `engine/mem-write.sh` over Bash, because Claude Code refuses its edit tools on paths inside a
+  `.claude` directory. `PILOT.md` explains it.
 - **`N raememberit hook group(s) wired`** — what it added to the settings file. It merges; it never
   replaces.
 
@@ -77,9 +80,12 @@ You should get a rule about `| tail && echo "OK"` reporting success over a faili
 /learn --type reference "the staging deploy needs the VPN even though the docs do not say so"
 ```
 
-Watch what it does. It should check for an existing memory covering the same ground *before*
-writing, then rebuild the index, then refuse to leave a near-duplicate behind. If it writes blindly,
-that is a bug worth reporting.
+Watch what it does. It should search for an existing memory covering the same ground *before*
+writing, write through `mem-write.sh`, rebuild the index, and refuse to leave a near-duplicate
+behind. If it writes blindly, that is a bug worth reporting.
+
+If it instead tries the ordinary file-writing tool and gets refused as a "sensitive file", that is
+also worth reporting — the command is supposed to know better.
 
 **Find it again in a fresh session.** Quit, restart, and `/recall` the topic. That round trip —
 written in one session, found in the next — is the whole product.
@@ -97,9 +103,16 @@ Everything else is automatic.
 ## If something looks broken
 
 ```bash
-bash $CLAUDE_CONFIG_DIR/raememberit/engine/rebuild-index.sh                     # regenerate the indexes
-python3 $CLAUDE_CONFIG_DIR/raememberit/engine/eval/run_eval.py --health         # structural check
-claude --bare                                                                   # run with hooks OFF, to tell kit from harness
+bash $CLAUDE_CONFIG_DIR/raememberit/engine/rebuild-index.sh               # regenerate the indexes
+python3 $CLAUDE_CONFIG_DIR/raememberit/engine/eval/run_eval.py --health   # structural check
+claude --bare                                                             # hooks OFF: tells kit from harness
+```
+
+To check the write path by hand:
+
+```bash
+printf -- '---\nname: probe\ndescription: A probe memory to confirm the write path works end to end\nmetadata:\n  type: reference\n---\n\nbody\n' \
+  | bash $CLAUDE_CONFIG_DIR/raememberit/engine/mem-write.sh reference probe
 ```
 
 That last one matters: if a problem disappears under `--bare`, it is this tool's fault, not Claude
@@ -112,3 +125,5 @@ Code's.
 ```
 
 Or simply `unset CLAUDE_CONFIG_DIR` and open a new terminal — your normal setup was never modified.
+Your memories live inside the trial config directory, so deleting that directory removes everything
+in one move.

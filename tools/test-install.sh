@@ -10,7 +10,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 T="${TMPDIR:-/tmp}/raememberit-install-test.$$"
 rm -rf "$T"; mkdir -p "$T"
-trap 'rm -rf "$T" "$(dirname "$T")/raememberit-memory"' EXIT
+trap 'rm -rf "$T"' EXIT
 
 pass=0; fail=0
 ck() { if [ "$2" = "$3" ]; then printf '  ok    %s\n' "$1"; pass=$((pass+1))
@@ -18,10 +18,10 @@ ck() { if [ "$2" = "$3" ]; then printf '  ok    %s\n' "$1"; pass=$((pass+1))
 ckt() { if eval "$2" >/dev/null 2>&1; then printf '  ok    %s\n' "$1"; pass=$((pass+1))
         else printf '  FAIL  %s\n' "$1"; fail=$((fail+1)); fi; }
 
-# The corpus is a SIBLING of the config dir (see engine/lib/raememberit-root.sh for why), so the tests
-# below look for memories there, not under the config dir.
-MEM="$(dirname "$T")/raememberit-memory"
-rm -rf "$MEM"
+# The corpus lives INSIDE the config dir, so the whole directory stays one portable unit. Writes get
+# there through engine/mem-write.sh over Bash, because the Edit/Write tools refuse paths inside a
+# `.claude` directory. See engine/lib/raememberit-root.sh.
+MEM="$T/memory"
 
 # a pre-existing settings file with the colleague's OWN hook, which must survive
 mkdir -p "$T"
@@ -66,10 +66,16 @@ ckt "commands do NOT re-derive the corpus path" "! grep -q 'CLAUDE_CONFIG_DIR:-\
 NMEM=$(grep -l "MEM=\"$MEM\"" "$T/commands"/*.md 2>/dev/null | wc -l | tr -d ' ')
 ck  "every command got the corpus path" "$NMEM" "5"
 
-echo "=== corpus lives OUTSIDE the config dir, and writing it does not prompt ==="
-ckt "corpus is a sibling, not inside .claude" "[ -d '$MEM/feedback' ] && [ ! -d '$T/memory/feedback' ]"
-ckt "corpus path published as env"            "grep -q 'RAEMEMBERIT_MEMORY_DIR' '$T/settings.json'"
-ckt "allow rule added for the corpus"         "grep -q 'Edit($MEM/\*\*)' '$T/settings.json'"
+echo "=== corpus lives INSIDE the config dir; the WRITE HELPER is what is permitted ==="
+ckt "corpus is inside the config dir"   "[ -d '$T/memory/feedback' ]"
+ckt "no stray sibling directory"        "[ ! -d '$(dirname "$T")/raememberit-memory' ]"
+ckt "corpus path published as env"      "grep -q 'RAEMEMBERIT_MEMORY_DIR' '$T/settings.json'"
+ckt "write helper is allow-listed"      "grep -q 'Bash(.*mem-write.sh' '$T/settings.json'"
+# An Edit() rule inside a .claude path is refused by the sensitive-file gate no matter what it says,
+# so promising one would be a lie the installer tells the user.
+ckt "no misleading Edit() rule on the corpus" "! grep -q 'Edit(.*/memory/' '$T/settings.json'"
+ckt "the helper actually writes"        "printf -- '---\nname: probe-note\ndescription: A probe memory written through the helper during the test suite\nmetadata:\n  type: reference\n---\n\nbody\n' | CLAUDE_CONFIG_DIR='$T' bash '$T/raememberit/engine/mem-write.sh' reference probe-note"
+ckt "and it lands in the catalog"       "grep -q 'probe-note' '$MEM/MEMORY-CATALOG.md'"
 
 echo "=== hooks merged, not replaced ==="
 ckt "their own hook survived"  "grep -q 'their-own-hook' '$T/settings.json'"
@@ -95,13 +101,12 @@ then printf '  ok    eval: %s\n' "$(cat "$T/evalsum")"; pass=$((pass+1))
 else printf '  FAIL  eval on the starter corpus\n'; sed 's/^/          /' "$T/evalsum" | head -6; fail=$((fail+1)); fi
 
 echo "=== a half-initialised corpus still gets its starter rules ==="
-H="$T-half"; HM="$(dirname "$T")/raememberit-memory-half"
-rm -rf "$H" "$HM"; mkdir -p "$HM/feedback"
-printf '# Memory Index\n' > "$HM/MEMORY.md"     # a generated index, not a memory
-RAEMEMBERIT_MEMORY_DIR="$HM" "$ROOT/install.sh" --config-dir "$H" --profile default >"$H.log" 2>&1
-NH=$(ls "$HM/feedback"/*.md 2>/dev/null | wc -l | tr -d ' ')
+H="$T-half"; rm -rf "$H"; mkdir -p "$H/memory/feedback"
+printf '# Memory Index\n' > "$H/memory/MEMORY.md"     # a generated index, not a memory
+"$ROOT/install.sh" --config-dir "$H" --profile default >"$H.log" 2>&1
+NH=$(ls "$H/memory/feedback"/*.md 2>/dev/null | wc -l | tr -d ' ')
 ckt "generated index alone does not count as an existing corpus (got $NH rules)" "[ '$NH' -ge 11 ]"
-rm -rf "$H" "$HM" "$H.log"
+rm -rf "$H" "$H.log"
 
 echo "=== RE-RUN (the half that matters) ==="
 # a memory the colleague wrote themselves, which must not be touched
@@ -134,7 +139,8 @@ ckt "engine removed"     "[ ! -d '$T/raememberit' ]"
 ckt "their own hook survived uninstall" "grep -q 'their-own-hook' '$T/settings.json'"
 ckt "their theme survived uninstall"    "grep -q '\"dark\"' '$T/settings.json'"
 ckt "no leftover hook entries"          "! grep -q '/raememberit/engine/hooks/' '$T/settings.json'"
-ckt "no leftover permission rules"      "! grep -q 'raememberit-memory' '$T/settings.json'"
+ckt "no leftover permission rules"      "! grep -q 'raememberit' '$T/settings.json'"
+ckt "the corpus directory itself survives" "[ -d '$MEM/feedback' ]"
 ckt "MEMORIES KEPT by default"          "[ -f '$MEM/feedback/their-own-rule.md' ]"
 ckt "uninstall said so"                 "grep -qi 'KEPT' '$T/unlog'"
 

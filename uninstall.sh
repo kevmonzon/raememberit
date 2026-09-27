@@ -38,7 +38,7 @@ MEM="${RAEMEMBERIT_MEMORY_DIR:-}"
 if [ -z "$MEM" ] && [ -f "$TARGET/settings.json" ]; then
   MEM=$(jq -r '.env.RAEMEMBERIT_MEMORY_DIR // empty' "$TARGET/settings.json" 2>/dev/null || true)
 fi
-[ -n "$MEM" ] || MEM="$(dirname "$TARGET")/raememberit-memory"
+[ -n "$MEM" ] || MEM="$TARGET/memory"
 
 say "Tooling"
 run rm -rf "$TARGET/raememberit"
@@ -65,7 +65,7 @@ perm = d.get("permissions", {}); rules = 0
 for k in ("allow", "deny", "ask"):
     if k in perm:
         before = len(perm[k])
-        perm[k] = [r for r in perm[k] if "raememberit-memory" not in r]
+        perm[k] = [r for r in perm[k] if "raememberit" not in r and "/memory/**" not in r]
         rules += before - len(perm[k])
         if not perm[k]: del perm[k]
 if not perm: d.pop("permissions", None)
@@ -85,8 +85,9 @@ if [ ! -d "$MEM" ]; then ok "no corpus at $MEM"
 elif [ "$PURGE" = 0 ]; then
   N=$(find "$MEM" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
   ok "KEPT: $N file(s) at $MEM"
-  printf '    Plain markdown — readable and greppable with this tool gone. Delete it yourself,\n'
-  printf '    or re-run with --purge, if you truly want it gone.\n'
+  printf '    Plain markdown, inside your config directory — readable and greppable with this tool\n'
+  printf '    gone, and it travels with the rest of your config. Delete it yourself, or re-run with\n'
+  printf '    --purge, if you truly want it gone.\n'
 else
   N=$(find "$MEM" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
   warn "--purge will permanently delete $N file(s) at $MEM"

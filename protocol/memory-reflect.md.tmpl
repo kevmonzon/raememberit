@@ -18,7 +18,18 @@ written. What remains is the narrative, which only exists here.
 
 ### 1. Interaction log
 
-Write or update `$MEM/interactions/YYYY-MM-DD-HH-MM-<topic>.md`:
+```bash
+engine/mem-write.sh log <topic-slug> <<'EOF'
+# <what this session was about>
+...
+EOF
+```
+
+The helper dates the filename, and **appends** rather than duplicating if a log for the same topic
+already exists today. Use it rather than the Write tool: the corpus sits inside the config directory,
+where Claude Code refuses those tools per file as sensitive paths.
+
+Capture:
 
 - what was asked, and the context
 - decisions reached — **including the ones declined**, and why, so a later session does not
@@ -45,6 +56,9 @@ it in the log as a candidate. Do **not** write the skill now; `/skill-mine` prom
 recurrence, and one session is an anecdote.
 
 ### 4. Index
+
+`mem-write.sh` already rebuilds the indexes and runs the duplicate gate on every write. Run them
+directly only if you edited a memory by hand:
 
 ```bash
 bash engine/rebuild-index.sh

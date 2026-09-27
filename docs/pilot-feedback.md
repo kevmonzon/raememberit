@@ -63,7 +63,7 @@ Anything obviously missing that you had to write yourself?
 ## 7. The always-on cost
 
 ```bash
-wc -c "$RAEMEMBERIT_MEMORY_DIR/MEMORY.md"
+wc -c "$CLAUDE_CONFIG_DIR/memory/MEMORY.md"
 ```
 
 Value at the end of the week:
