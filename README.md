@@ -92,16 +92,14 @@ exclusions: an excluded file is a blind spot, and a gate with blind spots is dec
 
 ## Trying it
 
-If you were asked to pilot this, start here:
-
 | | |
 |---|---|
-| **`docs/PILOT.md`** | what it is, what we want to learn, what is already known to be rough, how to stop |
-| **`docs/QUICKSTART.md`** | fifteen minutes, in an isolated config directory that leaves your normal setup untouched |
-| **`docs/pilot-feedback.md`** | short form to send back — blanks are fine |
+| **`docs/ADOPTING.md`** | what it is, what is known to be rough, how to back out |
+| **`docs/QUICKSTART.md`** | fifteen minutes — in your own config directory, or an isolated one first |
 
-**Integrating this with a Claude Code setup you already have is a separate conversation** and is
-deliberately not covered yet. Pilot it in a clean config directory.
+**Adopting into a setup you have already customized is a supported path**, not a later conversation:
+`install.sh` brings the engine and hooks and leaves your commands alone, and guided mode names any
+memory hooks you already have instead of quietly running both. See `docs/ADOPTING.md`.
 
 ## Two ways to get the hooks
 
@@ -196,7 +194,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-112 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+146 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

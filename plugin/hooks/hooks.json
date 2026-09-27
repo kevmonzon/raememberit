@@ -1,5 +1,5 @@
 {
-  "description": "raememberit's hooks. GENERATED from engine/settings.fragment.json by tools/gen-plugin-hooks.sh \u2014 do not hand-edit; two hook definitions is a drift surface and this project has been bitten by that three times.",
+  "description": "raememberit's hooks. GENERATED from engine/settings.fragment.json by tools/build-plugin.sh - do not hand-edit. Code paths are ${CLAUDE_PLUGIN_ROOT}-relative; the corpus is resolved at runtime to the config dir by engine/lib/raememberit-root.sh and is never rewritten here.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,7 +7,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/skillmine-nag.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/hooks/place-shim.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/hooks/skillmine-nag.sh",
             "timeout": 5
           }
         ]
@@ -18,7 +23,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/inject-memory.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/hooks/inject-memory.sh",
             "timeout": 5
           }
         ]
@@ -30,7 +35,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/precompact-notice.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/hooks/precompact-notice.sh",
             "timeout": 5
           }
         ]
@@ -42,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/rearm-inject.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/hooks/rearm-inject.sh",
             "timeout": 5
           }
         ]
@@ -54,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/require-log.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/hooks/require-log.sh",
             "timeout": 5
           }
         ]
@@ -66,12 +71,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/close-log.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/hooks/close-log.sh",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/rearm-inject.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/hooks/rearm-inject.sh",
             "timeout": 5
           }
         ]
@@ -81,7 +86,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/rebuild-index-hook.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/hooks/rebuild-index-hook.sh",
             "timeout": 30
           }
         ]

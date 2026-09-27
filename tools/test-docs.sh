@@ -59,11 +59,29 @@ echo "=== the plugin's hooks are generated from the settings fragment, not typed
 # descriptions of one mechanism diverging, so one is generated from the other and this asserts it.
 if [ ! -f "$ROOT/plugin/hooks/hooks.json" ]; then
   bad "plugin/hooks/hooks.json is missing"
-elif diff -q <(jq -S '.hooks' "$ROOT/engine/settings.fragment.json") \
-              <(jq -S '.hooks' "$ROOT/plugin/hooks/hooks.json") >/dev/null 2>&1; then
-  ok "plugin hooks.json matches engine/settings.fragment.json"
+elif python3 - "$ROOT" <<'PYCHK'
+import json, sys
+root = sys.argv[1]
+def graph(path, key="hooks"):
+    d = json.load(open(path))[key]
+    out = []
+    for ev, groups in d.items():
+        for g in groups:
+            for h in g["hooks"]:
+                out.append((ev, g.get("matcher", None), h["command"].rsplit("/hooks/", 1)[-1], h.get("timeout")))
+    return sorted(out)
+frag = graph(root + "/engine/settings.fragment.json")
+plug = graph(root + "/plugin/hooks/hooks.json")
+# The plugin adds exactly one hook the standalone install does not need: place-shim.sh, which gives
+# the write helper a version-free path for the permission rule. A standalone install already has one.
+extra = [e for e in plug if e not in frag]
+missing = [e for e in frag if e not in plug]
+sys.exit(0 if not missing and [e[2] for e in extra] == ["place-shim.sh"] else 1)
+PYCHK
+then
+  ok "plugin hooks.json carries the same hooks as the fragment (+ place-shim only)"
 else
-  bad "plugin hooks.json has drifted — re-run tools/gen-plugin-hooks.sh"
+  bad "plugin hooks.json has drifted — re-run tools/build-plugin.sh"
 fi
 if command -v claude >/dev/null 2>&1; then
   if claude plugin validate "$ROOT/plugin" 2>&1 | grep -q "Validation passed"; then ok "plugin manifest validates"
@@ -105,8 +123,9 @@ A=$(bash "$ROOT/tools/test-sanitize-scan.sh" | tail -1 | awk '{print $1}')
 B=$(bash "$ROOT/tools/test-dedup.sh"        | tail -1 | awk '{print $1}')
 C=$(bash "$ROOT/tools/test-mem-write.sh"    | tail -1 | awk '{print $1}')
 D=$(bash "$ROOT/tools/test-install.sh"      | tail -1 | awk '{print $1}')
-TOT=$((A+B+C+D))
-for f in README.md docs/PILOT.md; do
+E=$(bash "$ROOT/tools/test-plugin.sh"       | tail -1 | awk '{print $1}')
+TOT=$((A+B+C+D+E))
+for f in README.md docs/ADOPTING.md; do
   claimed=$(grep -oE '[0-9]+ (automated )?assertions' "$ROOT/$f" | head -1 | awk '{print $1}')
   if [ -z "$claimed" ]; then ok "$f claims no assertion count"
   elif [ "$claimed" = "$TOT" ]; then ok "$f assertion count is current ($TOT)"

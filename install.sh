@@ -8,7 +8,7 @@
 #   ./install.sh --guided | --no-guided            # walk me through it / just install
 #
 # GUIDED MODE is on by default for a fresh interactive install and off otherwise (a re-run, or
-# no terminal). It is the onboarding: a pilot who has to read a document first is a pilot who
+# no terminal). It is the onboarding: someone who has to read a document first is someone who
 # starts late or not at all. It pauses at each step that changes something, shows what it is
 # about to do, and never writes to your CLAUDE.md unasked.
 #   ./install.sh --force                           # also top up an existing corpus scaffold
@@ -407,12 +407,12 @@ note ""
 note "It removes only its own hooks, commands and rules. Your settings and your own hooks survive."
 pause
 
-step "Telling us how it went"
+step "If something is wrong"
 note "The single most useful thing you can report is the first moment you were confused —"
 note "what you expected, and what happened instead. Write that down while it is fresh; it"
 note "evaporates within a day."
 note ""
-note "Short form to fill in:  docs/pilot-feedback.md"
-note "Negative findings are the point. A week of \"this did nothing for me\" is a useful week."
+note "Second most useful: anything irritating enough that you would turn it off. Especially"
+note "the hooks — a thing that is mildly annoying every session compounds into uninstalled."
 printf '\n'
-ok "Set up. Go and use it for a week."
+ok "Set up. Go and use it."

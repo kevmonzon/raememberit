@@ -47,7 +47,7 @@ It prints every step. Two lines worth reading:
   portable.
 - **`N permission rule(s) added so the write helper runs without prompting`** — memories are written
   by `engine/mem-write.sh` over Bash, because Claude Code refuses its edit tools on paths inside a
-  `.claude` directory. `PILOT.md` explains it.
+  `.claude` directory. `ADOPTING.md` explains it.
 - **`N raememberit hook group(s) wired`** — what it added to the settings file. It merges; it never
   replaces.
 

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "_comment": "Retrieval eval queries. Replace these with YOUR corpus's real lookups: the point is to encode the questions you actually ask, then notice when a corpus change makes one stop resolving. Each query lists the memory `name:` values that SHOULD be found.",
+  "queries": [
+    {"q": "how do I verify a change actually took effect",
+     "expect": ["verify-effect-not-just-wiring"]},
+    {"q": "documented invariant may be stale",
+     "expect": ["documented-invariant-is-a-claim"]},
+    {"q": "build output tail hides a failure",
+     "expect": ["read-full-build-output-not-just-the-tail", "verification-tail-masks-failure"]},
+    {"q": "prove a regression test fails before the fix",
+     "expect": ["prove-regression-test-fails-without-the-fix"]}
+  ]
+}

@@ -7,7 +7,7 @@
 #   ./uninstall.sh --dry-run
 #
 # By DEFAULT your memories are kept. Removing the tooling should never cost you the notes you
-# wrote with it — and a pilot nobody can back out of cleanly is a pilot nobody should agree to.
+# wrote with it — and a tool nobody can back out of cleanly is a tool nobody should adopt.
 #
 # What it removes: the engine, the installed commands, this tool's hook entries, its permission
 # rules and its env entry. Your own hooks, rules and settings are left untouched.

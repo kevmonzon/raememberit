@@ -1,6 +1,68 @@
 {
   "name": "raememberit",
-  "version": "0.1.0",
-  "description": "Memory discipline for Claude Code: a two-tier context budget, indexes generated from frontmatter, and hooks that make capture involuntary. Supplies the hooks; the engine and commands live in the config directory alongside it.",
-  "author": { "name": "raememberit" }
+  "version": "0.2.0",
+  "description": "Memory discipline for Claude Code: a two-tier context budget, indexes generated from frontmatter, and hooks that make capture involuntary.",
+  "author": {
+    "name": "raememberit"
+  },
+  "userConfig": {
+    "user": {
+      "type": "string",
+      "title": "How to address you",
+      "description": "How the assistant should address you in its own memory files. Left empty, memories read impersonally.",
+      "default": ""
+    },
+    "memoryDir": {
+      "type": "string",
+      "title": "Corpus location",
+      "description": "Corpus location. Keep it inside the config directory so the whole directory stays one portable unit.",
+      "default": ""
+    },
+    "dupes": {
+      "type": "string",
+      "title": "Duplicate gate",
+      "description": "Duplicate gate on write. 'block' refuses a near-duplicate, 'warn' writes it and says so, 'off' skips the check. Start on 'warn' when adopting an existing corpus.",
+      "options": [
+        "block",
+        "warn",
+        "off"
+      ],
+      "default": "warn"
+    },
+    "requireLog": {
+      "type": "string",
+      "title": "Require an interaction log",
+      "description": "Whether a session may end without an interaction log. 'strict' refuses, 'warn' reminds, 'off' says nothing.",
+      "options": [
+        "warn",
+        "strict",
+        "off"
+      ],
+      "default": "warn"
+    },
+    "precompactMessage": {
+      "type": "string",
+      "title": "Pre-compaction reminder",
+      "description": "What the pre-compaction reminder says. Empty uses the default wording.",
+      "default": ""
+    },
+    "recentN": {
+      "type": "string",
+      "title": "Recent logs in the index",
+      "description": "How many recent interaction logs the always-on index lists. The always-on tier has no natural ceiling, so this is the knob that bounds it.",
+      "default": "8"
+    },
+    "personaFile": {
+      "type": "string",
+      "title": "Persona file",
+      "description": "Optional path to a persona file appended to the instruction fragment.",
+      "default": ""
+    },
+    "vocabularyFile": {
+      "type": "string",
+      "title": "Vocabulary file",
+      "description": "Optional path to a project-vocabulary file used when expanding recall queries.",
+      "default": ""
+    }
+  }
 }
