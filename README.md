@@ -110,6 +110,27 @@ deliberately not covered yet. Pilot it in a clean config directory.
 Idempotent: re-run it to upgrade. It **merges** hooks into an existing settings file rather than
 replacing it, never overwrites an existing corpus, and never touches credentials.
 
+### Adopting this into a setup you have already customized
+
+A re-install never overwrites a command you have edited. The installer keeps a manifest of what it
+wrote (`raememberit/.installed-commands`) and treats each command one of four ways:
+
+| State | Action |
+|---|---|
+| absent | install |
+| identical to what we would write | already current |
+| matches the manifest — ours, untouched | update |
+| differs from the manifest, or has no entry at all | **skip**, and say so |
+
+A skipped command's shipped version is saved to `raememberit/shipped/<name>` and the installer prints
+a runnable `diff`, so the warning can be acted on rather than merely noted. `--force-commands` takes
+the shipped versions anyway; it is deliberately **separate** from `--force`, because topping up a
+scaffold should never be a reason to discard someone's command text.
+
+Without the manifest the only safe policy would be "never update", stranding everyone on whatever
+version they first installed. With it, upgrades reach untouched files and stop at edited ones — the
+same reason a package manager treats config files this way.
+
 ### Where the corpus lives, and how writes get there
 
 **Inside the config directory**, at `<config>/memory` — so the whole directory stays a single
@@ -141,7 +162,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-91 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+99 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

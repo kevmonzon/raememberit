@@ -4,6 +4,12 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 W="${TMPDIR:-/tmp}/raememberit-memwrite.$$"
 export CLAUDE_CONFIG_DIR="$W"
+
+# A test of a DEFAULT must not inherit that setting from the environment. An adopted setup sets
+# RAEMEMBERIT_DUPES in settings.json, and Claude Code puts settings env into the tool environment of
+# a running session — so these assertions silently stopped testing the default and started confirming
+# the ambient value. Unset every knob this suite exercises, explicitly.
+unset RAEMEMBERIT_DUPES RAEMEMBERIT_REQUIRE_LOG RAEMEMBERIT_MEMORY_DIR RAEMEMBERIT_RECENT_N 2>/dev/null || true
 mkdir -p "$W/memory"/{feedback,project,reference,interactions,eval}
 trap 'rm -rf "$W"' EXIT
 MW="$ROOT/engine/mem-write.sh"

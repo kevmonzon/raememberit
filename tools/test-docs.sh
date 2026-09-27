@@ -10,6 +10,10 @@
 # particular rot within days: two were already stale when this check was written.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Knobs an adopted setup may set in settings.json reach a running session's tool environment.
+# A suite that inherits them is not testing the shipped defaults.
+unset RAEMEMBERIT_DUPES RAEMEMBERIT_REQUIRE_LOG RAEMEMBERIT_MEMORY_DIR RAEMEMBERIT_RECENT_N 2>/dev/null || true
 W="${TMPDIR:-/tmp}/raememberit-docs.$$"; mkdir -p "$W"
 trap 'rm -rf "$W"' EXIT
 

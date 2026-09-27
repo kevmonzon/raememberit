@@ -5,11 +5,17 @@
 #   ./install.sh --profile example --user Alex
 #   ./install.sh --config-dir ~/sandbox/.claude    # a throwaway target
 #   ./install.sh --dry-run                         # say what would change, change nothing
-#   ./install.sh --force                           # also replace an existing corpus scaffold
+#   ./install.sh --force                           # also top up an existing corpus scaffold
+#   ./install.sh --force-commands                  # also overwrite commands YOU have edited
+#
+# --force and --force-commands are deliberately SEPARATE. Conflating them would mean that topping up
+# a scaffold silently discards command customizations, which is exactly the kind of coupling that
+# loses work.
 #
 # It will NOT:
 #   - touch credentials, or any *.local.json
 #   - overwrite an existing memory/ corpus without --force
+#   - overwrite a command you have edited, ever, without --force-commands
 #   - replace your settings file — hooks are MERGED, and re-merging replaces only raememberit's own
 #
 # bash 3.2 compatible (macOS /bin/bash). Derived from a single-user bootstrap script that had
@@ -18,7 +24,7 @@ set -euo pipefail
 
 SRC="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-PROFILE="default"; USERNAME=""; FORCE=0; DRY=0
+PROFILE="default"; USERNAME=""; FORCE=0; FORCECMD=0; DRY=0
 
 say()  { printf '\033[1;36m▸ %s\033[0m\n' "$*"; }
 ok()   { printf '  \033[1;32m✓\033[0m %s\n' "$*"; }
@@ -32,6 +38,7 @@ while [ $# -gt 0 ]; do
     --profile)    PROFILE="${2:?}"; shift 2 ;;
     --user)       USERNAME="${2:?}"; shift 2 ;;
     --force)      FORCE=1; shift ;;
+    --force-commands) FORCECMD=1; shift ;;
     --dry-run)    DRY=1; shift ;;
     -h|--help)    sed -n '2,20p' "$0"; exit 0 ;;
     *)            die "unknown option: $1" ;;
@@ -116,23 +123,82 @@ fi
 [ -f "$PDIR/vocabulary.txt" ] && run cp "$PDIR/vocabulary.txt" "$TARGET/raememberit/vocabulary.txt"
 
 say "Commands"
-n=0
+# A command may have been customized locally — the whole point of adopting this into an existing setup
+# is that the text can be YOURS. So the installer distinguishes three cases using a manifest of what
+# it wrote last time (raememberit/.installed-commands):
+#
+#   absent                     -> install
+#   matches what we wrote      -> ours, untouched: safe to update
+#   differs from what we wrote -> YOU edited it: SKIP, and say so
+#   no manifest entry at all   -> unknown provenance: SKIP, conservatively
+#
+# Without the manifest the only safe policy would be "never update", which would strand everyone on
+# whatever version they first installed. With it, upgrades flow to untouched files and stop at edited
+# ones, which is the behaviour a package manager has for config files and for the same reason.
+MANIFEST="$TARGET/raememberit/.installed-commands"
+n=0; skipped=0; updated=0
+[ "$DRY" = 0 ] && : > "$MANIFEST.new"
 for t in "$SRC/protocol"/*.md.tmpl; do
   [ -e "$t" ] || continue
   b="$(basename "$t" .tmpl)"
-  if [ "$DRY" = 1 ]; then printf '  would: install commands/%s\n' "$b"; else
-    # {{MEM}} is filled with the RESOLVED corpus path, not an expression the command has to
-    # re-derive. A command that re-derives it drifts the moment the resolution rule changes — which
-    # it did once, and the stale snippet then greps the wrong directory and reports a confident
-    # "no prior memory".
-    sed -e "s/{{USER}}/$PUSER/g" -e "s|{{MEM}}|$MEM|g" \
-        -e "s|engine/|$TARGET/raememberit/engine/|g" "$t" > "$TARGET/commands/$b"
-  fi
-  n=$((n+1))
-done
-ok "$n command(s) installed with the addressee filled in"
+  dest="$TARGET/commands/$b"
+  rendered="${TMPDIR:-/tmp}/rmb-render.$$"
+  sed -e "s/{{USER}}/$PUSER/g" -e "s|{{MEM}}|$MEM|g" \
+      -e "s|engine/|$TARGET/raememberit/engine/|g" "$t" > "$rendered"
+  newsum=$(shasum "$rendered" | cut -d' ' -f1)
 
-# ── corpus ──────────────────────────────────────────────────────────────────────────
+  if [ ! -e "$dest" ]; then
+    action=install
+  else
+    cursum=$(shasum "$dest" | cut -d' ' -f1)
+    recorded=$(grep " $b\$" "$MANIFEST" 2>/dev/null | cut -d' ' -f1 || true)
+    if [ "$cursum" = "$newsum" ];        then action=current
+    elif [ -z "$recorded" ];             then action=skip-unknown
+    elif [ "$cursum" = "$recorded" ];    then action=update
+    else                                      action=skip-edited
+    fi
+  fi
+
+  case "$action" in
+    install|update)
+      if [ "$DRY" = 1 ]; then printf '  would: %s commands/%s\n' "$action" "$b"
+      else cp "$rendered" "$dest"; printf '%s %s\n' "$newsum" "$b" >> "$MANIFEST.new"; fi
+      [ "$action" = update ] && updated=$((updated+1)) || n=$((n+1)) ;;
+    current)
+      [ "$DRY" = 0 ] && printf '%s %s\n' "$newsum" "$b" >> "$MANIFEST.new" ;;
+    skip-edited)
+      # Save the version we WOULD have written, so the comparison is a runnable command rather than a
+      # suggestion. A warning you cannot act on is only noise.
+      if [ "$DRY" = 0 ]; then
+        mkdir -p "$TARGET/raememberit/shipped"; cp "$rendered" "$TARGET/raememberit/shipped/$b"
+      fi
+      warn "commands/$b — YOU edited this; left alone"
+      printf '      diff %s %s\n' "$TARGET/raememberit/shipped/$b" "$dest"
+      skipped=$((skipped+1))
+      # keep the old record so the file stays recognised as edited on the next run
+      [ "$DRY" = 0 ] && { r=$(grep " $b\$" "$MANIFEST" 2>/dev/null || true); [ -n "$r" ] && printf '%s\n' "$r" >> "$MANIFEST.new"; } ;;
+    skip-unknown)
+      warn "commands/$b — already present and not written by this installer; left alone"
+      skipped=$((skipped+1)) ;;
+  esac
+  rm -f "$rendered"
+done
+if [ "$FORCECMD" = 1 ] && [ "$skipped" -gt 0 ]; then
+  warn "--force-commands given: overwriting the $skipped skipped command(s)"
+  for t in "$SRC/protocol"/*.md.tmpl; do
+    b="$(basename "$t" .tmpl)"
+    if [ "$DRY" = 1 ]; then printf '  would: overwrite commands/%s\n' "$b"; else
+      sed -e "s/{{USER}}/$PUSER/g" -e "s|{{MEM}}|$MEM|g" \
+          -e "s|engine/|$TARGET/raememberit/engine/|g" "$t" > "$TARGET/commands/$b"
+      shasum "$TARGET/commands/$b" | sed "s| .*| $b|" >> "$MANIFEST.new"
+    fi
+  done
+  n=$((n+skipped)); skipped=0
+fi
+[ "$DRY" = 0 ] && mv "$MANIFEST.new" "$MANIFEST"
+ok "commands: $n installed · $updated updated · $skipped left alone (yours)"
+[ "$skipped" -gt 0 ] && printf '    Your edits are kept. Pass --force-commands to take the shipped versions instead.\n'
+
 # ── instructions fragment ───────────────────────────────────────────────────────────
 say "Instructions"
 FRAG="$TARGET/raememberit/INSTRUCTIONS-fragment.md"

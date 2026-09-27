@@ -11,6 +11,10 @@
 #   run_eval.py --health --strict-dupes           refuses the corpus AFTER a bad write
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Knobs an adopted setup may set in settings.json reach a running session's tool environment.
+# A suite that inherits them is not testing the shipped defaults.
+unset RAEMEMBERIT_DUPES RAEMEMBERIT_REQUIRE_LOG RAEMEMBERIT_MEMORY_DIR RAEMEMBERIT_RECENT_N 2>/dev/null || true
 W="${TMPDIR:-/tmp}/raememberit-dedup.$$"
 export CLAUDE_CONFIG_DIR="$W"
 mkdir -p "$W/memory"/{feedback,project,reference,interactions,eval}

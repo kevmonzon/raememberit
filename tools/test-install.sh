@@ -8,6 +8,10 @@
 # that second time is the one nobody watches.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Knobs an adopted setup may set in settings.json reach a running session's tool environment.
+# A suite that inherits them is not testing the shipped defaults.
+unset RAEMEMBERIT_DUPES RAEMEMBERIT_REQUIRE_LOG RAEMEMBERIT_MEMORY_DIR RAEMEMBERIT_RECENT_N 2>/dev/null || true
 T="${TMPDIR:-/tmp}/raememberit-install-test.$$"
 rm -rf "$T"; mkdir -p "$T"
 trap 'rm -rf "$T"' EXIT
@@ -130,6 +134,24 @@ ckt "their own hook still there"     "grep -q 'their-own-hook' '$T/settings.json
 ckt "their own memory untouched"     "[ -f '$MEM/feedback/their-own-rule.md' ]"
 ck  "their user_profile NOT overwritten" "$(cat "$MEM/user_profile.md")" "custom"
 ckt "re-run reported leaving the corpus alone" "grep -qi 'left completely alone' '$T/log2'"
+
+echo "=== a command YOU edited is never overwritten by a re-install ==="
+# This is the one failure mode that would silently destroy work: adopting the kit into an existing
+# setup means the command text may legitimately be yours.
+MAN="$T/raememberit/.installed-commands"
+ckt "install recorded a manifest"  "[ -s '$MAN' ]"
+printf '\n<!-- local edit that must survive -->\n' >> "$T/commands/learn.md"
+EDITED=$(shasum "$T/commands/learn.md" | cut -d' ' -f1)
+"$ROOT/install.sh" --config-dir "$T" --profile example --user Casey >"$T/log3" 2>&1
+ck  "edited command untouched" "$(shasum "$T/commands/learn.md" | cut -d' ' -f1)" "$EDITED"
+ckt "and it said so"                    "grep -q 'YOU edited this' '$T/log3'"
+ckt "the shipped version is saved for comparison" "[ -f '$T/raememberit/shipped/learn.md' ]"
+ckt "the diff hint it printed is runnable"        "grep -qE 'diff .+/shipped/learn.md .+/commands/learn.md' '$T/log3'"
+ckt "the other four were not skipped"             "grep -q '1 left alone' '$T/log3'"
+# and the escape hatch works, but only when asked for explicitly
+"$ROOT/install.sh" --config-dir "$T" --profile example --user Casey --force-commands >"$T/log4" 2>&1
+ckt "--force-commands overwrites it"    "! grep -q 'local edit that must survive' '$T/commands/learn.md'"
+ckt "and says it is doing so"           "grep -q 'force-commands given' '$T/log4'"
 
 echo "=== UNINSTALL leaves their setup as it was, and keeps their memories ==="
 "$ROOT/uninstall.sh" --config-dir "$T" >"$T/unlog" 2>&1
