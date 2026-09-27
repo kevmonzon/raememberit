@@ -45,11 +45,12 @@ note()  { printf '   %s\n' "$*"; }
 pause() { # only ever pauses when someone is actually there to read it
   [ "$GUIDED" = 1 ] || return 0
   interactive || return 0
-  printf '\n   \033[2m[Enter to continue]\033[0m '; read -r _ </dev/tty 2>/dev/null || true; printf '\n'
+  [ -r /dev/tty ] || return 0
+  printf '\n   \033[2m[Enter to continue]\033[0m '; read -r _ </dev/tty || true; printf '\n'
 }
 confirm() { # confirm "question"  -> 0 yes, 1 no. Non-interactive answers yes, and says so.
-  if [ "$GUIDED" != 1 ] || ! interactive; then return 0; fi
-  printf '   %s [y/N] ' "$1"; read -r r </dev/tty 2>/dev/null || r=y
+  if [ "$GUIDED" != 1 ] || ! interactive || [ ! -r /dev/tty ]; then return 1; fi
+  printf '   %s [y/N] ' "$1"; read -r r </dev/tty || r=n
   case "$r" in [yY]*) return 0 ;; *) return 1 ;; esac
 }
 
@@ -363,12 +364,15 @@ note ""
 note "It tells Claude the corpus exists and when to use the two commands. Without it they still"
 note "work when you type them, but they will not fire on their own — which is most of the value."
 if confirm "Append it to a CLAUDE.md now?"; then
-  printf '   path to your CLAUDE.md [skip]: '; read -r cmd_path </dev/tty 2>/dev/null || cmd_path=""
+  cmd_path=""
+  printf '   path to your CLAUDE.md [skip]: '
+  [ -r /dev/tty ] && { read -r cmd_path </dev/tty || cmd_path=""; }
+  printf '\n'
   if [ -n "$cmd_path" ] && [ -f "$cmd_path" ]; then
     printf '\n' >> "$cmd_path"; cat "$TARGET/raememberit/INSTRUCTIONS-fragment.md" >> "$cmd_path"
     ok "appended to $cmd_path"
   else note "skipped — paste it in whenever you like"; fi
-else note "skipped — the fragment is there when you want it"; fi
+else note "not appended — the fragment is there when you want it"; fi
 pause
 
 step "Your first loop — do this now, it takes two minutes"
