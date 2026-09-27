@@ -4,6 +4,14 @@
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+# UNSET THE AMBIENT KNOBS. These are set in a real settings.json, so a suite that inherits them is
+# testing the developer's own configuration instead of the defaults — and RAEMEMBERIT_MEMORY_DIR is worse
+# than misleading: install.sh read it in preference to --config-dir, so runs that believed they were
+# sandboxed seeded and rebuilt THE LIVE CORPUS. Measured 2026-09-28, after that variable first appeared
+# in settings. test-install.sh already did this; this suite was written without it.
+unset RAEMEMBERIT_MEMORY_DIR RAEMEMBERIT_DUPES RAEMEMBERIT_REQUIRE_LOG RAEMEMBERIT_RECENT_N \
+      RAEMEMBERIT_USER RAEMEMBERIT_PRECOMPACT_MSG RAEMEMBERIT_PERSONA_FILE RAEMEMBERIT_VOCAB_FILE 2>/dev/null || true
+
 pass=0; fail=0
 ok()  { pass=$((pass+1)); printf '  ok   %s\n' "$1"; }
 bad() { fail=$((fail+1)); printf '  FAIL %s\n' "$1"; }
@@ -561,6 +569,80 @@ have=$(ls "$tc/commands"/*.md 2>/dev/null | wc -l | tr -d ' ')
 [ "$tot" = "$have" ] && ok "the numbers add up to the $have files present" \
                      || bad "the tally sums to $tot but $have command files exist"
 rm -rf "$(dirname "$tc")"
+
+echo "== diff-commands.sh: the frozen decision stays revisitable =="
+# The installer never overwrites a command it did not write, which is right — but the cost is silent:
+# improvements to command MECHANICS never reach an adopted setup and nothing says so. This makes the
+# divergence visible on demand, and it must be strictly READ-ONLY.
+td="$(mktemp -d)/.claude"
+bash install.sh --config-dir "$td" --no-guided --user Tester >/dev/null 2>&1
+out_d="$(CLAUDE_CONFIG_DIR="$td" bash tools/diff-commands.sh --stat 2>&1)"
+printf '%s' "$out_d" | grep -q 'identical to the shipped version' \
+  && ok "a fresh install reports its commands as identical" \
+  || bad "a fresh install is reported as diverging from its own templates"
+printf '%s' "$out_d" | grep -q 'addressee "Tester"' \
+  && ok "it renders with the REMEMBERED addressee, not the default" \
+  || bad "it does not use the recorded addressee, so every command would look changed"
+
+# Divergence is detected, and reported as additions on the installed side.
+printf '\n<!-- my own note -->\n' >> "$td/commands/learn.md"
+out_e="$(CLAUDE_CONFIG_DIR="$td" bash tools/diff-commands.sh --stat 2>&1)"
+printf '%s' "$out_e" | grep -q 'learn.md' && printf '%s' "$out_e" | grep -qE '\+[0-9]+ / -[0-9]+' \
+  && ok "an edited command is reported with a line count" || bad "an edited command was not reported"
+
+# READ-ONLY is the whole safety property: a tool for inspecting your own edits must not touch them.
+fp_before="$(find "$td/commands" -name '*.md' | sort | xargs shasum | shasum | awk '{print $1}')"
+CLAUDE_CONFIG_DIR="$td" bash tools/diff-commands.sh >/dev/null 2>&1
+CLAUDE_CONFIG_DIR="$td" bash tools/diff-commands.sh --stat >/dev/null 2>&1
+fp_after="$(find "$td/commands" -name '*.md' | sort | xargs shasum | shasum | awk '{print $1}')"
+[ "$fp_before" = "$fp_after" ] && ok "it writes nothing — commands are byte-identical after two runs" \
+                              || bad "diff-commands.sh MODIFIED a command file"
+# And it must not leave its render temp files behind.
+ls "${TMPDIR:-/tmp}"/rmb-diff.* >/dev/null 2>&1 && bad "left a render temp file behind" \
+                                                || ok "cleans up its temp files"
+# A command that is not installed is named, not skipped in silence.
+# CAPTURE FIRST, GREP AFTER. Piping into `grep -q` under `set -o pipefail` fails the pipeline even when
+# grep MATCHES: grep exits at the first hit, the writer takes SIGPIPE, pipefail reports it. Third time
+# this has produced a false FAIL in this project today.
+rm -f "$td/commands/skill-mine.md"
+out_f="$(CLAUDE_CONFIG_DIR="$td" bash tools/diff-commands.sh --stat 2>&1)"
+printf '%s' "$out_f" | grep -q 'skill-mine.*not installed' \
+  && ok "a missing command is reported as not installed" || bad "a missing command is silently skipped"
+rm -rf "$(dirname "$td")"
+
+echo "== an explicit --config-dir outranks an ambient corpus variable =="
+# THE WORST BUG OF THIS WHOLE EFFORT, and it was live for about twenty minutes. Once
+# RAEMEMBERIT_MEMORY_DIR was published into a real settings.json, install.sh read it in preference to
+# --config-dir — so every run that believed it was sandboxed seeded and re-indexed the LIVE corpus, and
+# one --force run copied a starter rule into it. lib/raememberit-root.sh even carries a comment warning
+# about this exact shape.
+ta="$(mktemp -d)/.claude"
+decoy="$(mktemp -d)/decoy-corpus"
+mkdir -p "$decoy/feedback"
+out_a="$(RAEMEMBERIT_MEMORY_DIR="$decoy" bash install.sh --config-dir "$ta" --no-guided --user T 2>&1)"
+printf '%s' "$out_a" | grep -q 'ignoring RAEMEMBERIT_MEMORY_DIR' \
+  && ok "it says it is ignoring the ambient variable" || bad "it silently honoured the ambient variable"
+printf '%s' "$out_a" | grep -q "corpus at $ta/memory" \
+  && ok "the corpus goes where --config-dir says" || bad "the corpus did not go under --config-dir"
+[ -d "$ta/memory/feedback" ] && ok "the sandbox corpus was created" || bad "no sandbox corpus"
+# The decoy must be untouched: that is the whole point.
+[ -z "$(ls -A "$decoy/feedback" 2>/dev/null)" ] \
+  && ok "the directory the variable named was NOT written to" \
+  || bad "the ambient corpus was written to despite an explicit --config-dir"
+# But when no --config-dir is given, the variable must still work: that is how a published path is honoured.
+tb="$(mktemp -d)/.claude"; mkdir -p "$tb"
+out_b="$(CLAUDE_CONFIG_DIR="$tb" RAEMEMBERIT_MEMORY_DIR="$tb/elsewhere" bash install.sh --no-guided --user T 2>&1)"
+printf '%s' "$out_b" | grep -q "corpus at $tb/elsewhere" \
+  && ok "with no --config-dir the variable is still honoured" \
+  || bad "the variable is ignored even when no --config-dir was given"
+rm -rf "$(dirname "$ta")" "$(dirname "$decoy")" "$(dirname "$tb")"
+
+echo "== this suite must not inherit the developer's own configuration =="
+for v in RAEMEMBERIT_MEMORY_DIR RAEMEMBERIT_DUPES RAEMEMBERIT_REQUIRE_LOG RAEMEMBERIT_USER; do
+  eval "val=\${$v:-}"
+  [ -z "$val" ] || bad "$v is set inside the suite ($val) — assertions would test a real configuration"
+done
+ok "the ambient raememberit variables are unset for the whole suite"
 
 echo
 echo "  $pass passed, $fail failed"

@@ -141,6 +141,13 @@ templates and `engine/settings.fragment.json`; `tools/test-plugin.sh` rebuilds i
 and diffs, so editing either side without rebuilding fails. Two descriptions of one mechanism is a drift
 surface and this project has been bitten by it three times.
 
+**Adopted commands are never overwritten — and `tools/diff-commands.sh` keeps that revisitable.** The
+installer refuses to touch a command it did not write, because in an adopted setup the text is *yours*.
+The cost is silent: improvements to command mechanics never arrive and nothing says so. That script
+renders each template exactly as the installer would — using the remembered addressee, so nothing looks
+changed merely because a flag was omitted — and diffs it against what is installed. It is strictly
+read-only, and an assertion requires the command files to be byte-identical after two runs.
+
 **Does an update disturb a corpus?** No — measured, not argued. `tools/test-lifecycle.sh` runs the real
 `install → update → uninstall` cycle against a throwaway config directory and asserts the corpus is
 byte-identical afterwards, mtimes included, and that memories survive an uninstall. It lives outside
@@ -235,7 +242,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-218 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+230 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

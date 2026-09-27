@@ -36,6 +36,7 @@ set -euo pipefail
 
 SRC="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+TARGET_EXPLICIT=0   # set when --config-dir names a target, which then outranks ambient variables
 USERNAME=""; PERSONA=""; VOCAB=""; FORCE=0; FORCECMD=0; DRY=0; GUIDED=auto; PLUGINMODE=0; ASPLUGIN=0; HFP=0
 SHIM=""   # in --plugin mode, the discovered stable path of the write helper
 
@@ -79,7 +80,7 @@ find_predecessor_hooks() {
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --config-dir) TARGET="${2:?}"; shift 2 ;;
+    --config-dir) TARGET="${2:?}"; TARGET_EXPLICIT=1; shift 2 ;;
     --user)       USERNAME="${2:?}"; shift 2 ;;
     --persona)    PERSONA="${2:?}"; shift 2 ;;
     --vocabulary) VOCAB="${2:?}"; shift 2 ;;
@@ -315,7 +316,29 @@ say "Corpus"
 # Edit/Write tools refuse per file — an Edit() allow rule does NOT override it. Engineered around
 # rather than accepted: writes go through engine/mem-write.sh over Bash, which is not gated, and one
 # Bash() allow rule below covers it. Reads are not gated at all.
+# AN EXPLICIT --config-dir MUST OUTRANK AN AMBIENT RAEMEMBERIT_MEMORY_DIR.
+#
+# It did not, and the consequence was as bad as it sounds: once that variable was published into a real
+# settings.json, every `--config-dir /tmp/sandbox` run silently operated on the corpus the variable named.
+# Test suites believed they were isolated while seeding and re-indexing the live corpus; one run with
+# --force copied a starter rule into it. Measured 2026-09-28.
+#
+# lib/raememberit-root.sh carries a comment warning about exactly this shape — "which makes an 'isolated'
+# test quietly mutate the real thing" — and the installer had the bug anyway. Reading a warning is not the
+# same as applying it.
+#
+# The rule: a flag the caller typed beats a variable the environment happened to carry. Env still wins
+# when no --config-dir was given, which is how a published corpus path keeps working.
 MEM="${RAEMEMBERIT_MEMORY_DIR:-$TARGET/memory}"
+if [ "$TARGET_EXPLICIT" = 1 ] && [ -n "${RAEMEMBERIT_MEMORY_DIR:-}" ]; then
+  case "$RAEMEMBERIT_MEMORY_DIR" in
+    "$TARGET"/*) : ;;   # inside the named config dir: consistent, keep it
+    *) warn "ignoring RAEMEMBERIT_MEMORY_DIR=$RAEMEMBERIT_MEMORY_DIR"
+       warn "  --config-dir $TARGET was given explicitly, and that variable points outside it."
+       warn "  Using $TARGET/memory. An ambient variable must not redirect an explicitly targeted install."
+       MEM="$TARGET/memory" ;;
+  esac
+fi
 ok "corpus at $MEM"
 FRESH=0        # must be initialised: `set -u` aborts on the existing-corpus path otherwise
 HAVE=$(find "$MEM/feedback" "$MEM/project" "$MEM/reference" -name '*.md' 2>/dev/null | head -1 || true)
