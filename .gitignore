@@ -1,0 +1,13 @@
+# The real denylist carries internal vocabulary. Committing it would publish the very
+# terms it exists to suppress. See tools/sanitize-scan.sh.
+.denylist.local.txt
+
+# Never commit credentials or machine-local state.
+.credentials.json
+settings.local.json
+*.local.json
+
+.DS_Store
+node_modules/
+__pycache__/
+*.pyc

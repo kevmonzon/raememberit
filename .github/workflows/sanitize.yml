@@ -1,0 +1,16 @@
+name: sanitize
+on: [push, pull_request]
+
+# NOTE ON GATE STRENGTH: the full denylist carries internal vocabulary and is therefore
+# not in this repo. CI runs the public shape-only list by default. To run the full gate,
+# store the pattern file as the repository secret MEMKIT_DENYLIST and it will be used.
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write private denylist if provided
+        if: ${{ secrets.MEMKIT_DENYLIST != '' }}
+        run: printf '%s\n' "${{ secrets.MEMKIT_DENYLIST }}" > .denylist.local.txt
+      - name: Scan
+        run: tools/sanitize-scan.sh

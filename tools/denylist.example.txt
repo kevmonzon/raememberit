@@ -1,0 +1,17 @@
+# denylist.example.txt — PUBLIC. Universal secret shapes only.
+# Internal vocabulary belongs in .denylist.local.txt (gitignored) — putting it here
+# would publish the very terms it exists to suppress. Format: SEV<TAB>regex<TAB>why
+
+FAIL	gh[pousr]_[A-Za-z0-9]{16,}	GitHub token
+FAIL	\bsk-[A-Za-z0-9_-]{16,}	OpenAI-style secret key
+FAIL	\bsk-ant-[A-Za-z0-9_-]{16,}	Anthropic API key
+FAIL	\bAKIA[0-9A-Z]{16}\b	AWS access key id
+FAIL	\bxox[abprs]-[A-Za-z0-9-]{10,}	Slack token
+FAIL	Bearer\s+[A-Za-z0-9._~+/-]{20,}	bearer token
+FAIL	-----BEGIN [A-Z ]*PRIVATE KEY-----	private key block
+FAIL	\b[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com	AWS account id in ECR host
+FAIL	/Users/[a-z][a-z0-9._-]+/	absolute macOS home path (leaks a username)
+FAIL	/home/[a-z][a-z0-9._-]+/	absolute Linux home path (leaks a username)
+FAIL	\{\{[A-Z_]+\}\}	unfilled template slot left in a shipped file
+WARN	\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b	email address
+WARN	\b[A-Z]{2,6}-[0-9]{2,6}\b	ticket-key shape (may be an example)
