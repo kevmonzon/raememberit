@@ -12,7 +12,7 @@ being generalized; you are the first person other than its author to run it.
 
 ## What we actually want to learn
 
-Not "does it work" — there are 99 automated assertions for that, and they pass. What we cannot test
+Not "does it work" — there are 102 automated assertions for that, and they pass. What we cannot test
 is the part you are for:
 
 1. **Where do you stall?** The first minute you are confused, stop and write down what you expected.

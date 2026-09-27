@@ -95,6 +95,13 @@ RAEMEMBERIT_DUPES=warn "$MW" feedback trust-the-file --update < "$W/again" > "$W
 if grep -q 'advisory' "$W/warnout"; then printf '  ok    %s\n' "warn mode names the pair as advisory"; pass=$((pass+1))
 else printf '  FAIL  %s\n' "warn mode did not label the report advisory"; sed 's/^/          /' "$W/warnout" | tail -4; fail=$((fail+1)); fi
 
+echo "=== the PreCompact message is overridable, and quoting-safe ==="
+H="$ROOT/engine/hooks/precompact-notice.sh"
+ckt "default is valid JSON"            "bash '$H' | jq -e . >/dev/null"
+ckt "override is honoured"             "RAEMEMBERIT_PRECOMPACT_MSG=custom-xyz bash '$H' | grep -q custom-xyz"
+# The message is interpolated into JSON; a naive implementation breaks on the first quote someone uses.
+ckt "override survives quotes and \$vars" "RAEMEMBERIT_PRECOMPACT_MSG='a \"b\" \$c' bash '$H' | jq -e . >/dev/null"
+
 echo "─────"
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1
