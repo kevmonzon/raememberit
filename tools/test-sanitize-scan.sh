@@ -49,7 +49,13 @@ probe "ECR account id"    "host: 000000000000.d""kr.ecr.ap-northeast-1.amazonaws
 echo "=== identifying paths and unfilled slots ==="
 probe "absolute macOS home path" "cd /Use""rs/somebody/thing"
 probe "absolute Linux home path" "cd /ho""me/somebody/thing"
-probe "unfilled template slot"   "greeting for {{""USER}}"
+
+echo "=== unfilled slots are an INSTALL-time check, not a commit-time one ==="
+printf 'greeting for %s%s\n' '{{' 'USER}}' > "$WORK/repo/probe.md"
+check "a slot does NOT block a commit (the repo holds templates)" 0 "$S"
+check "but check-filled.sh rejects it in an installed tree" 1 "$ROOT/tools/check-filled.sh" "$WORK/repo"
+rm -f "$WORK/repo/probe.md"
+check "and passes once nothing is left unfilled" 0 "$ROOT/tools/check-filled.sh" "$WORK/repo"
 
 echo "=== per-line escape hatch ==="
 printf 'cd /Use%ss/somebody/thing\n' "r" > "$WORK/repo/probe.md"

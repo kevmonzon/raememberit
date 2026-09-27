@@ -84,6 +84,32 @@ disclosure it was written to prevent — so it is not in here.
 The gate treats **scanning zero files as an error, not a pass**, and carries no file
 exclusions: an excluded file is a blind spot, and a gate with blind spots is decoration.
 
+## Testing in isolation
+
+Point `CLAUDE_CONFIG_DIR` at a throwaway directory and Claude Code relocates its entire config
+there — settings, skills, commands, corpus, session history. Verified: a sandbox session's writes
+never reached the default corpus across an entire development session (identical fingerprint
+before and after).
+
+```bash
+export CLAUDE_CONFIG_DIR=~/somewhere/sandbox/.claude
+```
+
+Two things to know before trusting it:
+
+**Auth does not carry over.** Each config dir gets its own credentials, so a sandbox needs its own
+`/login` — once. After that it can be driven unattended with `claude -p`.
+
+**It isolates writes, not reads.** `CLAUDE_CONFIG_DIR` does not change `$HOME`, so a session can
+still read the default config at its absolute path — and one did, unprompted, while looking for
+prior art, absorbing the other setup's voice along with it. Permission `deny` rules for
+`Read(<live>/**)` and `Edit(<live>/**)` close the tool-based route (`Edit` covers all file-editing
+tools; a separate `Write` rule is not matched), but they do **not** constrain arbitrary Bash — so
+state the boundary in the sandbox's own `CLAUDE.md` as well. Setting a fake `$HOME` would close
+the path-based route completely but breaks authentication, so it is not recommended.
+
+A test that reads the thing it is isolating from has proven nothing.
+
 ## License
 
 MIT — see `LICENSE`. The copyright holder is unset pending the first public push.

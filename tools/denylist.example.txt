@@ -1,4 +1,7 @@
 # denylist.example.txt — PUBLIC. Universal secret shapes only.
+# NOTE: no rule here for unfilled template markers (double-brace placeholders). This repo
+# legitimately contains templates,
+# so that check belongs at INSTALL time and lives in tools/check-filled.sh.
 # Internal vocabulary belongs in .denylist.local.txt (gitignored) — putting it here
 # would publish the very terms it exists to suppress. Format: SEV<TAB>regex<TAB>why
 
@@ -12,6 +15,5 @@ FAIL	-----BEGIN [A-Z ]*PRIVATE KEY-----	private key block
 FAIL	\b[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com	AWS account id in ECR host
 FAIL	/Users/[a-z][a-z0-9._-]+/	absolute macOS home path (leaks a username)
 FAIL	/home/[a-z][a-z0-9._-]+/	absolute Linux home path (leaks a username)
-FAIL	\{\{[A-Z_]+\}\}	unfilled template slot left in a shipped file
 WARN	\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b	email address
 WARN	\b[A-Z]{2,6}-[0-9]{2,6}\b	ticket-key shape (may be an example)

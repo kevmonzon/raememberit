@@ -1,0 +1,94 @@
+---
+name: memory-audit
+description: Use when auditing the memory corpus itself — read-only health pass (index integrity, frontmatter, duplicates and contradictions, finished work in project/, doc drift, hook wiring vs docs, the second silo) closed by the eval harness against a frozen baseline. Proposes fixes; applies none without approval.
+---
+
+# /memory-audit
+
+A read-only health pass over the corpus, ending in a findings table for approval. Every check here
+exists because it once found a real defect that no retrieval improvement could have fixed.
+
+Distinct from `/memory-reflect` (writing this session's memories) and `/skill-mine` (promoting
+patterns to skills).
+
+```bash
+MEM="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memory"
+```
+
+## 1. Structure and index integrity
+
+```bash
+for d in feedback project reference; do echo "$d $(find "$MEM/$d" -name '*.md' | wc -l)"; done
+find "$MEM/interactions" -name '*.md' | wc -l
+# frontmatter: every durable memory needs name + description
+for f in "$MEM"/{feedback,project,reference}/*.md; do
+  grep -q '^name:' "$f" && grep -q '^description:' "$f" || echo "MALFORMED $f"; done
+```
+
+Check the index **both directions**: every file appears in an index, and every index entry points
+at a file that exists. If they are out of sync the fix is `engine/rebuild-index.sh` — never a hand
+edit.
+
+## 2. Duplicates and contradictions — the defects retrieval cannot fix
+
+```bash
+python3 engine/eval/run_eval.py --health --strict-dupes
+```
+
+- Near-identical descriptions. The worst case observed was **three files describing one fact,
+  written within four hours**.
+- The same identifier in two `project/` memories ⇒ read both for contradictory status. One ticket
+  acquired two memories two days apart that disagreed.
+- Two memories on one topic may coexist **only if they answer different questions.** Where they do,
+  say so explicitly and cross-link them rather than merging.
+
+## 3. Staleness
+
+- `project/` files whose body says SHIPPED / DONE / merged / closed. **The directory is not a
+  status signal** — 62% carried such signals in the corpus this came from. Report the count; do not
+  propose an archive sweep unless asked.
+- File-path claims: check existence, but treat `<placeholder>` paths as **templates, not claims**,
+  and paths to repos absent from this machine as **unverifiable, not stale**. Both mistakes
+  inflated the defect rate on the first audit that tried this — corrected, path validity was
+  **69.3% of verifiable claims**, not the 48.5% first reported. Both corrections favoured the corpus.
+- Wikilinks: dangling and orphan rates.
+
+## 4. Documentation drift
+
+- **Hardcoded counts in prose.** Counts belong only in `rebuild-index.sh` output; they drift within
+  days. Any number written into a document is a defect waiting to happen.
+- **Hook wiring versus documentation.** Read the hooks from the **live settings files**, never from
+  a document or a memory. Two consecutive audits got this wrong by reasoning from the previous
+  audit's description; one guard-file claim flipped **three times** that way, and one documented
+  hook turned out to exist in no settings file at all. This is why the hook table is generated:
+
+```bash
+bash tools/gen-hook-table.sh
+```
+
+## 5. The second silo
+
+```bash
+ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/projects/*/memory/*.md 2>/dev/null
+```
+
+Claude Code's own auto-memory, keyed by working directory — so a memory written from one directory
+is invisible from another, and some entries may come from other machines. Report anything
+feedback-grade that deserves promotion into this corpus. Do not hand-edit it; the harness owns it.
+
+## 6. The eval harness — the number that closes the audit
+
+```bash
+python3 engine/eval/run_eval.py
+python3 engine/eval/run_eval.py --health
+```
+
+Compare against the frozen baseline in `eval/`. **Never edit an expectation to turn a run green.**
+If a fix is applied later, re-run and report the delta — that is the only evidence it helped.
+
+## 7. Report
+
+One table: finding · evidence (count/path) · impact · proposed fix · reversible? Then **stop**.
+
+Before any edit: back it up and show the change. Log every decision, including declines, in the
+interaction log.

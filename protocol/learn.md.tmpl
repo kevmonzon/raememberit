@@ -1,0 +1,128 @@
+---
+name: learn
+description: Use the moment {{USER}} corrects you, states a preference, or you discover a non-obvious fact worth keeping — writes one durable memory and rebuilds the index in a single step. Cheap enough to run mid-task; do not defer to end of session.
+---
+
+# /learn
+
+Capture **one** thing, immediately, while it is still exact.
+
+The end-of-session sweep loses nuance: by then you remember *that* you were corrected, not the
+sentence that corrected you. This command exists so capture costs seconds and can happen inline.
+
+```bash
+MEM="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memory"
+```
+
+## Usage
+
+```
+/learn                          # infer from the last exchange
+/learn {{USER}} wants X, not Y
+/learn --type reference "the service listens on 23306, not 3306"
+```
+
+## Trigger — run this without being asked
+
+- {{USER}} **corrects** you, or says "no", "actually", "next time", "always", "never", "I told you"
+- {{USER}} states a **preference** about how work should be done
+- You hit a **non-obvious fact** that cost real effort to establish — an error's true cause, an
+  undocumented port, a flag that silently does nothing
+- {{USER}} says **"remember this"**
+
+Do **not** run it for things the repo already records: code structure, git history, a fix that
+lives in a commit, anything in project instructions. If {{USER}} asks you to remember one of
+those, ask what was non-obvious about it and save *that* instead.
+
+## Steps
+
+### 1. Classify
+
+| Type | Goes in | Test |
+|---|---|---|
+| `feedback` | `feedback/` | a rule about **how I should work** |
+| `project` | `project/` | state of **ongoing work** not derivable from code or git |
+| `reference` | `reference/` | a **pointer or fact** about an external system or tool |
+
+Interaction narrative is *not* a durable memory — that belongs in the session log.
+
+### 2. Reconcile against what exists — RUN THE TOOL, do not eyeball it
+
+This step has a **measured failure rate**. Three separate memories describing one identical
+environment fact were written inside a **four-hour window, by one person**, because the step was
+prose and prose is treated as advisory.
+
+So it is not prose any more. Run it:
+
+```bash
+python3 engine/find-similar.py --desc "<the description you were about to write>" <key> <nouns>
+```
+
+It ranks existing memories by description overlap and similarity, flags likely duplicates, and
+prints nothing you can skim past. A memory whose **description** already covers the fact is the
+one retrieval will surface *instead of* your new file — which is why description matches outrank
+body matches in its scoring.
+
+Then record a verdict against every flagged candidate:
+
+| Verdict | When | Action |
+|---|---|---|
+| **NOOP** | an existing memory already says this | write nothing; say which file covers it |
+| **UPDATE** | an existing memory is right but incomplete or now partly wrong | edit that file in place; do not create a sibling |
+| **ADD** | genuinely new, no overlapping memory | write the new file |
+| **SUPERSEDE** | an existing memory is now **wrong**, not merely stale | correct it in place; note what changed and when |
+
+Two memories may coexist on one topic only if they answer **different questions**. "It is about a
+different ticket" is not a different question — that is exactly how one ticket acquired two
+`project/` memories, two days apart, carrying contradictory status.
+
+**Default to UPDATE.** Fewer, richer, current memories beat a larger corpus retrieval cannot
+disambiguate. When torn between ADD and UPDATE, choose UPDATE.
+
+### 3. Write it
+
+A slug filename (`descriptive-slug.md`) for durable memories — **not** a dated one. Dates are for
+interaction logs only.
+
+```markdown
+---
+name: <kebab-slug>
+description: <one line — this is what gets injected and indexed, so make it a routing signal>
+metadata:
+  type: feedback | project | reference
+---
+
+<the fact, stated so it is actionable a month from now>
+
+**Why:** <the incident that produced it>
+**How to apply:** <what to do differently next time>
+```
+
+`feedback` and `project` **must** carry the Why/How lines. Convert relative dates to absolute —
+"last Tuesday" is unreadable in a month. Link related memories with `[[slug]]`, liberally; a link
+to a memory that does not exist yet marks something worth writing later, not an error.
+
+### 4. Rebuild the index, then let the corpus refuse a duplicate
+
+```bash
+bash engine/rebuild-index.sh
+python3 engine/eval/run_eval.py --health --strict-dupes
+```
+
+The first command makes the memory visible at all: `feedback` lands in the always-on index,
+`project` and `reference` land in the on-demand catalog behind `/recall`.
+
+The second **exits non-zero if the write you just made created a near-duplicate.** That is the
+point: it turns this corpus's most common defect from something an audit discovers months later
+into something the write itself refuses to leave behind. If it fails, go back to step 2 and pick
+UPDATE — do not talk yourself into ADD to get past the check.
+
+### 5. Confirm in one line
+
+State the path and the type. Do not narrate the whole file back.
+
+## Related
+
+- `/recall` — the read side
+- `/memory-reflect` — end-of-session sweep; this command's whole purpose is to make that sweep boring
+- `/skill-mine` — when the same memory keeps recurring, it wants to be a skill

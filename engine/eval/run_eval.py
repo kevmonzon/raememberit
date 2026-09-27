@@ -185,6 +185,11 @@ def main():
     ap.add_argument("--strategy", choices=["literal", "expanded", "both"], default="both")
     ap.add_argument("--health", action="store_true", help="structural checks only")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--strict-dupes", action="store_true",
+                    help="exit 1 if any near-duplicate description pair exists. Run this right "
+                         "after writing a memory: it turns the corpus's most common defect from "
+                         "something an audit finds months later into something the write itself "
+                         "refuses to leave behind.")
     a = ap.parse_args()
 
     docs, native = load_docs(), load_native()
@@ -214,6 +219,20 @@ def main():
                 "results": rs,
             }
     out["health"] = health(docs)
+
+    if a.strict_dupes:
+        n = out["health"].get("dup_pairs", 0)          # count
+        pairs = out["health"].get("_dups", [])          # the pairs themselves
+        if n:
+            print(f"STRICT-DUPES: {n} near-duplicate description pair(s):", file=sys.stderr)
+            for pr in pairs:
+                for f in pr:
+                    print(f"  {f}", file=sys.stderr)
+                print("  ---", file=sys.stderr)
+            print("Merge or differentiate them. Two memories may coexist only if they answer\n"
+                  "different questions; \"it is about a different ticket\" is not a different\n"
+                  "question.", file=sys.stderr)
+            return 1
 
     if a.json:
         print(json.dumps(out, indent=2, default=str)); return

@@ -1,0 +1,159 @@
+---
+name: recall
+description: Use BEFORE investigating any repo, ticket, tool, error or environment from scratch — searches the on-demand memory catalog and the full interaction-log history for prior work on the topic. Assume a relevant memory exists until this says otherwise.
+---
+
+# /recall
+
+Look up what is already known about a topic before spending a single tool call rediscovering it.
+
+The always-on index carries only **behavioural** memories — standing rules, plus the most recent
+sessions. Everything else — every project and reference memory, and the whole interaction-log
+history — lives on demand. This command is the bridge.
+
+Exact counts are deliberately not written down anywhere in this file; they drift within days. For
+live figures, run `engine/rebuild-index.sh`, which prints them.
+
+```bash
+MEM="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memory"
+```
+
+## Usage
+
+```
+/recall <topic>
+/recall "some multi word topic"
+/recall TICKET-1234
+```
+
+## When to run it — without being asked
+
+Run this **first**, unprompted, when a task touches any of:
+
+- a **repo** you have not already loaded context for
+- a **ticket key**
+- an **error string** or symptom
+- a **tool or environment**
+- anything phrased as *"didn't we…"*, *"what happened with…"*, *"remind me…"*
+
+The return on this command is concrete: a recurring production issue was once diagnosed in
+minutes purely because the prior memory was found first.
+
+## Steps
+
+### 1. Expand the query first — costs nothing, prevents the most common miss
+
+Every sweep below is **literal substring matching**. Searching for a hyphenated service name will
+not find a memory that wrote its acronym, and searching `auth` will not find `authentication`.
+Before searching, write down 3-6 variants and search them all:
+
+- the **acronym and its expansion**, both directions
+- **synonyms and the words a colleague would use** (`login` / `auth` / `signin` / `SSO` / `SAML`)
+- **morphology**: singular/plural, hyphen/underscore/space
+- the **error class** as well as the exact string (a specific exception name → its HTTP status,
+  `credentials`, `expired`)
+- for a ticket, both the **key** and what it is about
+
+```bash
+for t in "<variant1>" "<variant2>" "<variant3>"; do
+  echo "=== $t"; grep -i "$t" "$MEM/MEMORY-CATALOG.md"
+done
+```
+
+A miss on the first spelling is **not** evidence of absence — it is the single most common way
+this command reports "no prior memory" about something already recorded.
+
+**But keep short variants on a word boundary.** A bare 2-3 character variant is a substring of
+hundreds of ordinary words and will bury the hits you want under noise. Measured: adding one
+2-character acronym variant pushed a genuinely relevant memory from **rank 4 to rank 74**. For
+any variant of three characters or fewer, use `grep -w`:
+
+```bash
+grep -riw "XY" "$MEM/reference/"     # word-boundary — correct
+grep -ri  "XY" "$MEM/reference/"     # also matches "oxygen", "proxy" — useless
+```
+
+Verify any change to this step against the eval harness before trusting it:
+
+```bash
+python3 engine/eval/run_eval.py
+```
+
+### 2. Catalog sweep — cheap, always do this
+
+```bash
+grep -i "<topic>" "$MEM/MEMORY-CATALOG.md"
+```
+
+Each hit is `- [name](path) — description`. Read the **file**, not just the line.
+
+### 3. Interaction-log sweep — content first
+
+Interaction logs are named topic-first, so a filename match only works for identifiers. For a
+repo name, tool, or error string it returns nothing even when a dozen logs discuss it — measured
+on one topic where the filename sweep found **0** and the content sweep found **9**.
+
+```bash
+# PRIMARY — always run this
+grep -ril "<topic>" "$MEM/interactions/" | sort | tail -12   # newest last
+```
+
+```bash
+# ONLY for ticket keys — cheap, and exact
+ls "$MEM/interactions/" | grep -i "<TICKET-KEY>"
+```
+
+**Also sweep the second silo.** Claude Code keeps its own auto-memory, separate from this corpus:
+
+```bash
+grep -ril "<topic>" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/projects/*/memory/ 2>/dev/null
+```
+
+It is keyed by working directory, so a memory written from one project directory does not appear
+when you launch from another. Sweep it with the glob above rather than assuming your current
+directory's store is the only one. Do not hand-edit anything found there — the harness owns it.
+
+Prefer the **newest** hits. When hits span months, read the newest first and treat older ones as
+history, not as current state.
+
+### 4. Follow the wikilinks
+
+Memories cite each other as `[[slug]]`. Resolve them:
+
+```bash
+grep -rl "^name: <slug>" "$MEM"/{feedback,project,reference}/
+```
+
+### 5. Report before acting
+
+**Check whether the work is still live before reporting it as current.** In the corpus this
+discipline came from, **62% of `project/` memories** described work that had already shipped or
+closed, and they remained in the active-work directory by choice — so the directory name is not
+evidence of status. Read the body for SHIPPED / DONE / merged / closed and label each hit
+explicitly as *finished* or *live*. Reporting completed work as current is this structure's most
+likely way to mislead.
+
+State: what was found, **when** it was written, and whether it still holds. A memory records what
+was true when written — if it names a file, flag, or command, **verify it still exists** before
+recommending it.
+
+**Check the freshness of what you verify against.** On one lookup a memory named a newer deployed
+version than the local checkout did — because that checkout sat on a five-week-old feature branch.
+The local tree was *older than the memory*. Before treating a working tree as ground truth:
+
+```bash
+git -C <repo> rev-parse --abbrev-ref HEAD && git -C <repo> log -1 --format='%h %cI'
+```
+
+If it is stale or on a feature branch, say **"cannot confirm current state without fetching"**
+rather than reporting the checkout's value. Separate the **mechanism** (which stays true) from the
+**current value** (which does not).
+
+If nothing is found, say so explicitly — "no prior memory on X". That is a useful result, and it
+stops the next session from searching again.
+
+## Related
+
+- `/learn` — capture a single fact mid-task
+- `/memory-reflect` — the write side of this loop
+- `/skill-mine` — promote recurring patterns into skills
