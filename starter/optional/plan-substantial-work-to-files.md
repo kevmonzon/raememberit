@@ -25,7 +25,7 @@ implementing agent can execute cold. One treated as scaffolding does not survive
 
 ---
 
-*This rule ships in the `example` profile rather than the starter set on purpose.* It is a
-**working preference**, not an engineering truth — reasonable people run projects differently, so
-it belongs in a profile a person opts into. That distinction is the line the starter set is
-selected on.
+*This rule is optional rather than part of the starter set on purpose.* It is a **working
+preference**, not an engineering truth — reasonable people run projects differently, so it is
+something to opt into rather than something to receive. That distinction is the line the starter set
+is selected on.

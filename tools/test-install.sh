@@ -14,7 +14,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 unset RAEMEMBERIT_DUPES RAEMEMBERIT_REQUIRE_LOG RAEMEMBERIT_MEMORY_DIR RAEMEMBERIT_RECENT_N 2>/dev/null || true
 T="${TMPDIR:-/tmp}/raememberit-install-test.$$"
 rm -rf "$T"; mkdir -p "$T"
-trap 'rm -rf "$T"' EXIT
+trap 'rm -rf "$T" "$W_PERSONA" "$W_VOCAB"' EXIT
 
 pass=0; fail=0
 ck() { if [ "$2" = "$3" ]; then printf '  ok    %s\n' "$1"; pass=$((pass+1))
@@ -25,6 +25,8 @@ ckt() { if eval "$2" >/dev/null 2>&1; then printf '  ok    %s\n' "$1"; pass=$((p
 # The corpus lives INSIDE the config dir, so the whole directory stays one portable unit. Writes get
 # there through engine/mem-write.sh over Bash, because the Edit/Write tools refuse paths inside a
 # `.claude` directory. See engine/lib/raememberit-root.sh.
+W_PERSONA="${TMPDIR:-/tmp}/rmb-test-persona.$$"; printf '## Voice\n\nTerse.\n' > "$W_PERSONA"
+W_VOCAB="${TMPDIR:-/tmp}/rmb-test-vocab.$$";   printf 'auth, login, sso\n'   > "$W_VOCAB"
 MEM="$T/memory"
 
 # a pre-existing settings file with the colleague's OWN hook, which must survive
@@ -39,7 +41,7 @@ cat > "$T/settings.json" <<'J'
 J
 
 echo "=== fresh install ==="
-"$ROOT/install.sh" --config-dir "$T" --profile example --user Casey >"$T/log1" 2>&1
+"$ROOT/install.sh" --config-dir "$T" --user Casey --persona "$W_PERSONA" --vocabulary "$W_VOCAB" >"$T/log1" 2>&1
 ck "installer exited 0" "$?" "0"
 ckt "engine installed"              "[ -x '$T/raememberit/engine/rebuild-index.sh' ]"
 ck  "commands installed"            "$(ls "$T/commands" 2>/dev/null | wc -l | tr -d ' ')" "5"
@@ -47,18 +49,18 @@ ckt "indexes generated"             "[ -s '$MEM/MEMORY.md' ] && [ -s '$MEM/MEMOR
 ckt "user_profile installed"        "[ -f '$MEM/user_profile.md' ]"
 ckt "eval queries installed"        "[ -f '$MEM/eval/queries.json' ]"
 ckt "instructions fragment written" "[ -s '$T/raememberit/INSTRUCTIONS-fragment.md' ]"
-ckt "profile persona appended"      "grep -q '## Voice' '$T/raememberit/INSTRUCTIONS-fragment.md'"
-ckt "profile vocabulary installed"  "[ -f '$T/raememberit/vocabulary.txt' ]"
+ckt "--persona is appended to the fragment" "grep -q 'Terse.' '$T/raememberit/INSTRUCTIONS-fragment.md'"
+ckt "--vocabulary is installed"     "[ -f '$T/raememberit/vocabulary.txt' ]"
 
 echo "=== the addressee slot ==="
 ckt "no unfilled slots anywhere"    "bash '$ROOT/tools/check-filled.sh' '$T/commands'"
-ckt "--user overrode the profile"   "grep -q 'Casey' '$T/commands/learn.md'"
-ckt "profile default not used"      "! grep -q 'Alex' '$T/commands/learn.md'"
+ckt "--user reaches the commands"   "grep -q 'Casey' '$T/commands/learn.md'"
+ckt "no stray default addressee"    "! grep -q '{{USER}}' '$T/commands/learn.md'"
 
 echo "=== starter corpus ==="
 N=$(ls "$MEM/feedback"/*.md 2>/dev/null | wc -l | tr -d ' ')
-ckt "starter rules installed (got $N)" "[ '$N' -ge 11 ]"
-ckt "profile's extra rule installed"   "[ -f '$MEM/feedback/plan-substantial-work-to-files.md' ]"
+ck  "exactly the 11 starter rules" "$N" "11"
+ckt "optional rules are NOT installed" "[ ! -f '$MEM/feedback/plan-substantial-work-to-files.md' ]"
 ckt "always-on index lists them"       "grep -q 'verify-effect-not-just-wiring' '$MEM/MEMORY.md'"
 
 echo "=== installed commands point at the REAL corpus (doc/code drift guard) ==="
@@ -107,7 +109,7 @@ else printf '  FAIL  eval on the starter corpus\n'; sed 's/^/          /' "$T/ev
 echo "=== a half-initialised corpus still gets its starter rules ==="
 H="$T-half"; rm -rf "$H"; mkdir -p "$H/memory/feedback"
 printf '# Memory Index\n' > "$H/memory/MEMORY.md"     # a generated index, not a memory
-"$ROOT/install.sh" --config-dir "$H" --profile default >"$H.log" 2>&1
+"$ROOT/install.sh" --config-dir "$H"  >"$H.log" 2>&1
 NH=$(ls "$H/memory/feedback"/*.md 2>/dev/null | wc -l | tr -d ' ')
 ckt "generated index alone does not count as an existing corpus (got $NH rules)" "[ '$NH' -ge 11 ]"
 rm -rf "$H" "$H.log"
@@ -126,7 +128,7 @@ M
 echo "custom" > "$MEM/user_profile.md"
 BEFORE_HOOKS=$(grep -c '/raememberit/engine/hooks/' "$T/settings.json" | tr -d ' ')
 
-"$ROOT/install.sh" --config-dir "$T" --profile example --user Casey >"$T/log2" 2>&1
+"$ROOT/install.sh" --config-dir "$T" --user Casey --persona "$W_PERSONA" --vocabulary "$W_VOCAB" >"$T/log2" 2>&1
 ck "re-run exited 0" "$?" "0"
 AFTER_HOOKS=$(grep -c '/raememberit/engine/hooks/' "$T/settings.json" | tr -d ' ')
 ck  "hooks NOT duplicated on re-run" "$AFTER_HOOKS" "$BEFORE_HOOKS"
@@ -142,14 +144,14 @@ MAN="$T/raememberit/.installed-commands"
 ckt "install recorded a manifest"  "[ -s '$MAN' ]"
 printf '\n<!-- local edit that must survive -->\n' >> "$T/commands/learn.md"
 EDITED=$(shasum "$T/commands/learn.md" | cut -d' ' -f1)
-"$ROOT/install.sh" --config-dir "$T" --profile example --user Casey >"$T/log3" 2>&1
+"$ROOT/install.sh" --config-dir "$T" --user Casey --persona "$W_PERSONA" --vocabulary "$W_VOCAB" >"$T/log3" 2>&1
 ck  "edited command untouched" "$(shasum "$T/commands/learn.md" | cut -d' ' -f1)" "$EDITED"
 ckt "and it said so"                    "grep -q 'YOU edited this' '$T/log3'"
 ckt "the shipped version is saved for comparison" "[ -f '$T/raememberit/shipped/learn.md' ]"
 ckt "the diff hint it printed is runnable"        "grep -qE 'diff .+/shipped/learn.md .+/commands/learn.md' '$T/log3'"
 ckt "the other four were not skipped"             "grep -q '1 left alone' '$T/log3'"
 # and the escape hatch works, but only when asked for explicitly
-"$ROOT/install.sh" --config-dir "$T" --profile example --user Casey --force-commands >"$T/log4" 2>&1
+"$ROOT/install.sh" --config-dir "$T" --user Casey --persona "$W_PERSONA" --vocabulary "$W_VOCAB" --force-commands >"$T/log4" 2>&1
 ckt "--force-commands overwrites it"    "! grep -q 'local edit that must survive' '$T/commands/learn.md'"
 ckt "and says it is doing so"           "grep -q 'force-commands given' '$T/log4'"
 
@@ -161,7 +163,7 @@ cat > "$G/settings.json" <<'J'
 {"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"cat ~/.claude/memory/MEMORY.md"}]}],
           "SessionEnd":[{"matcher":"","hooks":[{"type":"command","command":"bash ~/.claude/memory/rebuild-index.sh"}]}]}}
 J
-"$ROOT/install.sh" --config-dir "$G" --profile default --guided >"$G.log" 2>&1
+"$ROOT/install.sh" --config-dir "$G"  --guided >"$G.log" 2>&1
 ck  "guided install exits 0 without a terminal" "$?" "0"
 ckt "warns about predecessor hooks"             "grep -q 'memory hooks of your own on' '$G.log'"
 ckt "names the events it found"                 "grep -qE 'own on:.*(UserPromptSubmit|SessionEnd)' '$G.log'"
@@ -172,11 +174,11 @@ ckt "explains the session-end reminder"         "grep -q 'RAEMEMBERIT_REQUIRE_LO
 ckt "does NOT write to any CLAUDE.md unasked"   "! test -f '$G/CLAUDE.md'"
 
 G2="$T-guided-clean"; rm -rf "$G2"
-"$ROOT/install.sh" --config-dir "$G2" --profile default --guided >"$G2.log" 2>&1
+"$ROOT/install.sh" --config-dir "$G2"  --guided >"$G2.log" 2>&1
 ckt "clean config gets no predecessor warning"  "grep -q 'no memory hooks of your own' '$G2.log'"
 
 # a re-run must not re-onboard someone who has already been onboarded
-"$ROOT/install.sh" --config-dir "$G2" --profile default >"$G2.log2" 2>&1
+"$ROOT/install.sh" --config-dir "$G2"  >"$G2.log2" 2>&1
 ckt "a plain re-run stays terse"                "! grep -q 'first loop' '$G2.log2'"
 rm -rf "$G" "$G2" "$G.log" "$G2.log" "$G2.log2"
 

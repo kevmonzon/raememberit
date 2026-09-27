@@ -2,7 +2,7 @@
 # raememberit installer. Safe to re-run: it upgrades in place and never overwrites your corpus.
 #
 #   ./install.sh                                   # into ${CLAUDE_CONFIG_DIR:-~/.claude}
-#   ./install.sh --profile example --user Alex
+#   ./install.sh --user Alex --persona ~/my-voice.md
 #   ./install.sh --config-dir ~/sandbox/.claude    # a throwaway target
 #   ./install.sh --dry-run                         # say what would change, change nothing
 #   ./install.sh --guided | --no-guided            # walk me through it / just install
@@ -30,7 +30,7 @@ set -euo pipefail
 
 SRC="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-PROFILE="default"; USERNAME=""; FORCE=0; FORCECMD=0; DRY=0; GUIDED=auto
+USERNAME=""; PERSONA=""; VOCAB=""; FORCE=0; FORCECMD=0; DRY=0; GUIDED=auto
 
 say()  { printf '\033[1;36m▸ %s\033[0m\n' "$*"; }
 ok()   { printf '  \033[1;32m✓\033[0m %s\n' "$*"; }
@@ -73,8 +73,9 @@ find_predecessor_hooks() {
 while [ $# -gt 0 ]; do
   case "$1" in
     --config-dir) TARGET="${2:?}"; shift 2 ;;
-    --profile)    PROFILE="${2:?}"; shift 2 ;;
     --user)       USERNAME="${2:?}"; shift 2 ;;
+    --persona)    PERSONA="${2:?}"; shift 2 ;;
+    --vocabulary) VOCAB="${2:?}"; shift 2 ;;
     --force)      FORCE=1; shift ;;
     --force-commands) FORCECMD=1; shift ;;
     --dry-run)    DRY=1; shift ;;
@@ -97,26 +98,23 @@ if [ "$GUIDED" = auto ]; then
 fi
 [ -d "$SRC/engine" ] || die "run this from a raememberit checkout (no engine/ next to install.sh)"
 
-# ── resolve the profile ─────────────────────────────────────────────────────────────
-say "Profile"
-if [ -d "$PROFILE" ]; then PDIR="$PROFILE"
-elif [ -d "$SRC/profiles/$PROFILE" ]; then PDIR="$SRC/profiles/$PROFILE"
-else die "no such profile: $PROFILE (try: default, example, or a path)"
+# ── who this is for, and two optional files ────────────────────────────────────────
+# There used to be a "profile" mechanism here: named bundles supplying an addressee, a persona, a
+# vocabulary and extra rules. It was built, documented, tested — and used by nobody, because one
+# person's configuration is a handful of VALUES, not a bundle. Values are what this takes now.
+say "Configuration"
+PUSER="${USERNAME:-you}"
+ok "addressee \"$PUSER\""
+if [ -n "$PERSONA" ]; then
+  [ -f "$PERSONA" ] || die "no such persona file: $PERSONA"
+  ok "persona from $PERSONA"
+else
+  ok "no persona (the default)"
 fi
-# NOTE: profiles set RAEMEMBERIT_USER, never USER. USER is a standard environment variable, so a
-# profile that simply omitted it would leave the shell's own USER in scope and this installer
-# would silently write the system username into every installed command.
-PUSER=""
-if [ -f "$PDIR/profile.env" ]; then
-  RAEMEMBERIT_USER=""
-  # shellcheck disable=SC1090
-  . "$PDIR/profile.env"
-  PUSER="${RAEMEMBERIT_USER:-}"
+if [ -n "$VOCAB" ]; then
+  [ -f "$VOCAB" ] || die "no such vocabulary file: $VOCAB"
+  ok "recall vocabulary from $VOCAB"
 fi
-[ -n "$USERNAME" ] && PUSER="$USERNAME"
-[ -n "$PUSER" ] || PUSER="you"
-ok "$(basename "$PDIR") · addressee \"$PUSER\""
-[ -f "$PDIR/persona.md" ] && ok "persona supplied" || ok "no persona (default)"
 
 # ── target ──────────────────────────────────────────────────────────────────────────
 if [ "$GUIDED" = 1 ]; then
@@ -187,15 +185,11 @@ if [ "$FRESH" = 1 ] || [ "$FORCE" = 1 ]; then
       [ -e "$f" ] || continue
       [ -f "$MEM/feedback/$(basename "$f")" ] || cp "$f" "$MEM/feedback/"
     done
-    for f in "$PDIR/feedback"/*.md; do
-      [ -e "$f" ] || continue
-      [ -f "$MEM/feedback/$(basename "$f")" ] || cp "$f" "$MEM/feedback/"
-    done
     [ -f "$MEM/eval/queries.json" ] || cp "$SRC/starter/queries.json" "$MEM/eval/queries.json"
   fi
   ok "scaffold, starter rules and eval queries in place (existing files never replaced)"
 fi
-[ -f "$PDIR/vocabulary.txt" ] && run cp "$PDIR/vocabulary.txt" "$TARGET/raememberit/vocabulary.txt"
+[ -n "$VOCAB" ] && run cp "$VOCAB" "$TARGET/raememberit/vocabulary.txt"
 
 say "Commands"
 # A command may have been customized locally — the whole point of adopting this into an existing setup
@@ -279,7 +273,7 @@ say "Instructions"
 FRAG="$TARGET/raememberit/INSTRUCTIONS-fragment.md"
 if [ "$DRY" = 1 ]; then printf '  would: write %s\n' "$FRAG"; else
   cp "$SRC/starter/INSTRUCTIONS-fragment.md" "$FRAG"
-  if [ -f "$PDIR/persona.md" ]; then { printf '\n'; cat "$PDIR/persona.md"; } >> "$FRAG"; fi
+  if [ -n "$PERSONA" ]; then { printf '\n'; cat "$PERSONA"; } >> "$FRAG"; fi
 fi
 ok "fragment written — it is YOURS to paste into CLAUDE.md; nothing was written to your CLAUDE.md"
 

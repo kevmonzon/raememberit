@@ -118,7 +118,7 @@ N=$(ls "$ROOT/starter/feedback"/*.md 2>/dev/null | wc -l | tr -d ' ')
 
 echo "=== the frozen baseline still describes a fresh install ==="
 T="$W/inst"
-bash "$ROOT/install.sh" --config-dir "$T" --profile default >/dev/null 2>&1
+bash "$ROOT/install.sh" --config-dir "$T" >/dev/null 2>&1
 CLAUDE_CONFIG_DIR="$T" python3 "$T/raememberit/engine/eval/run_eval.py" --json > "$W/now.json" 2>/dev/null
 if python3 - "$W/now.json" "$ROOT/starter/baseline.json" > "$W/cmp" 2>&1 <<'PY'
 import json,sys

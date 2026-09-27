@@ -18,7 +18,7 @@ database, no vector store, and no daemon — the corpus survives a `cp -r`.
 | `protocol/` | the commands that operate the corpus — recall, learn, reflect, audit, mine |
 | `scaffold/` | the empty corpus layout a fresh install gets |
 | `starter/` | a small set of generic engineering rules, each shipping with its evidence |
-| `profiles/` | local overlays: persona, addressee, domain vocabulary |
+| `starter/optional/` | rules that are working preferences rather than engineering truths — opt in, not installed |
 | `tools/` | the sanitization gate and its self-test |
 
 ## What it is not
@@ -125,10 +125,15 @@ their own.
 ## Install
 
 ```bash
-./install.sh                              # into ${CLAUDE_CONFIG_DIR:-~/.claude}
-./install.sh --profile example --user Alex
-./install.sh --dry-run                    # say what would change, change nothing
+./install.sh                                          # into ${CLAUDE_CONFIG_DIR:-~/.claude}
+./install.sh --user Alex --persona ~/my-voice.md      # optional
+./install.sh --dry-run                                # say what would change, change nothing
 ```
+
+Configuration is **values, not bundles**: `--user`, and optionally `--persona FILE` and
+`--vocabulary FILE`. Everything else is an environment knob in `settings.json` (see below). There was
+once a "profile" mechanism here — named bundles carrying all four — which was built, documented,
+tested and used by nobody, because one person's configuration is a handful of values.
 
 A fresh interactive install runs **guided**: it surveys what it found, warns if you already have
 memory hooks of your own (adopting alongside them doubles the work, and the installer will not remove
