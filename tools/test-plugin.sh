@@ -409,6 +409,51 @@ out7="$(bash install.sh --config-dir "$t5" --no-guided --force 2>&1)"; rc7=$?
                  || bad "--force did not override the refusal"
 rm -rf "$(dirname "$t5")"
 
+echo "== a rule is never added for a helper that does not exist =="
+# THE BUG THIS CATCHES. --as-plugin used to set the helper path unconditionally and report it as fact.
+# Against a config holding an OLDER raememberit plugin — one from before the engine shipped inside the
+# plugin — that named a file which was not there, and the rule went in anyway. A rule naming a
+# nonexistent path grants nothing and fails SILENTLY: writes just begin prompting, with nothing to say
+# why. So: verify, then refuse.
+t8="$(mktemp -d)/.claude"
+mkdir -p "$t8/skills/raememberit/.claude-plugin" "$t8/skills/raememberit/hooks"
+printf '{"name":"raememberit","version":"0.1.0"}\n' > "$t8/skills/raememberit/.claude-plugin/plugin.json"
+printf '{"hooks":{}}\n' > "$t8/skills/raememberit/hooks/hooks.json"
+out8="$(bash install.sh --as-plugin --config-dir "$t8" --no-guided 2>&1)"; rc8=$?
+[ "$rc8" != "0" ] && ok "a stale plugin directory (no engine/) is refused" \
+                  || bad "proceeded against a plugin directory that ships no engine"
+printf '%s' "$out8" | grep -q 'start prompting' \
+  && ok "the refusal explains the silent failure it prevents" || bad "the refusal does not explain itself"
+printf '%s' "$out8" | grep -q -- '--as-plugin --force' \
+  && ok "the refusal names the way out" || bad "the refusal names no remedy"
+# And it must die BEFORE writing anything.
+[ -f "$t8/settings.json" ] && bad "the refused run still wrote settings.json" \
+                           || ok "nothing was written before the refusal"
+# --force recovers, and then every Bash rule names a file that is really there.
+bash install.sh --as-plugin --config-dir "$t8" --no-guided --force >/dev/null 2>&1 \
+  && ok "--force replaces the stale directory and completes" || bad "--force did not recover"
+python3 -c 'import json,os,sys
+d=json.load(open("'"$t8"'/settings.json")); a=d.get("permissions",{}).get("allow",[])
+b=[r for r in a if r.startswith("Bash(")]
+paths=[r.split("(",1)[1].rsplit(":*",1)[0].replace("bash ","") for r in b]
+sys.exit(0 if b and all(os.path.isfile(x) for x in paths) else 1)' \
+  && ok "every Bash rule names a file that exists" \
+  || bad "a Bash rule names a path that is not there"
+rm -rf "$(dirname "$t8")"
+
+# The same guarantee on the ordinary fresh path, stated separately: the assertion above could pass on a
+# config that got no rules at all.
+t9="$(mktemp -d)/.claude"
+bash install.sh --as-plugin --config-dir "$t9" --no-guided >/dev/null 2>&1
+python3 -c 'import json,os,sys
+d=json.load(open("'"$t9"'/settings.json")); a=d.get("permissions",{}).get("allow",[])
+b=[r for r in a if r.startswith("Bash(")]
+paths=[r.split("(",1)[1].rsplit(":*",1)[0].replace("bash ","") for r in b]
+sys.exit(0 if len(b) == 2 and all(os.path.isfile(x) for x in paths) else 1)' \
+  && ok "a fresh --as-plugin install adds two Bash rules, both resolving" \
+  || bad "a fresh --as-plugin install did not add two resolving Bash rules"
+rm -rf "$(dirname "$t9")"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" = "0" ]

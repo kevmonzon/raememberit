@@ -174,18 +174,49 @@ if [ "$ASPLUGIN" = 1 ]; then
   SKILLDIR="$TARGET/skills/raememberit"
   [ -d "$SRC/plugin" ] || die "no plugin/ next to install.sh — run tools/build-plugin.sh first"
   # Never clobber a plugin directory someone has edited: same principle as the command manifest.
+  PLACED=0
   if [ -d "$SKILLDIR" ] && [ "$FORCE" != 1 ]; then
     warn "$SKILLDIR already exists — left alone. Pass --force to replace it."
   else
     run rm -rf "$SKILLDIR"
     run mkdir -p "$(dirname "$SKILLDIR")"
     run cp -R "$SRC/plugin" "$SKILLDIR"
+    PLACED=1
     ok "plugin placed at $SKILLDIR (auto-loads as raememberit@skills-dir; no settings entry needed)"
   fi
+
   # A skills-dir install has NO version component in its path, so the wrapper that exists for the
   # marketplace case is unnecessary here: name the engine itself and the rule still never moves.
-  SHIM="$SKILLDIR/engine/mem-write.sh"
-  ok "write helper: $SHIM (stable by construction — no version in the path)"
+  #
+  # BUT VERIFY IT EXISTS FIRST. An earlier version of this branch set SHIM unconditionally and reported
+  # it as fact. Against a config holding an OLDER raememberit plugin — one from before the engine was
+  # shipped inside the plugin — that named a file which was not there, and the permission rule went in
+  # anyway. A rule naming a nonexistent path grants nothing and fails SILENTLY: memory writes simply
+  # begin prompting, with nothing anywhere to say why. Exactly the fail-open shape this kit keeps
+  # tripping over, so the check is the fix and the refusal is the point.
+  CAND="$SKILLDIR/engine/mem-write.sh"
+  if [ "$DRY" = 1 ] && [ "$PLACED" = 1 ]; then
+    SHIM="$CAND"
+    ok "write helper would be $SHIM (stable by construction — no version in the path)"
+  elif [ -f "$CAND" ]; then
+    SHIM="$CAND"
+    ok "write helper: $SHIM (stable by construction — no version in the path)"
+  else
+    SHIM=""
+    warn "no write helper at $CAND"
+    warn ""
+    warn "$SKILLDIR exists but ships no engine/. That is a raememberit plugin from before the engine"
+    warn "was shipped inside it — or it is not a raememberit plugin at all. Either way there is nothing"
+    warn "to point a permission rule at, and adding one anyway would grant nothing while looking fine:"
+    warn "every memory write would just start prompting."
+    warn ""
+    warn "  ./install.sh --as-plugin --force    replace it with the current plugin"
+    warn ""
+    warn "If that directory is deliberate — a plugin supplying hooks while the engine lives in the"
+    warn "config dir — then --as-plugin is the wrong route for this setup and would move the engine"
+    warn "out from under anything referencing it."
+    die  "refusing to add a permission rule for a helper that does not exist."
+  fi
 elif [ "$PLUGINMODE" = 1 ]; then
   ok "skipped — the plugin ships its own engine at \${CLAUDE_PLUGIN_ROOT}/engine"
   # The permission rule must name an absolute path, and the plugin's own path carries a VERSION, so a
