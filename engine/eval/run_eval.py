@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Retrieval eval harness for a memkit corpus.
+"""Retrieval eval harness for a raememberit corpus.
 
 Stdlib only, no deps, no daemon — it must survive the same `cp -r ~/.claude` the
 corpus does.
@@ -19,13 +19,13 @@ Any candidate design that defines its own ranking should replace `search()` only
 import argparse, json, os, pathlib, re, sys
 from difflib import SequenceMatcher
 
-# Root resolution mirrors engine/lib/memkit-root.sh: CLAUDE_CONFIG_DIR relocates the whole
+# Root resolution mirrors engine/lib/raememberit-root.sh: CLAUDE_CONFIG_DIR relocates the whole
 # config but does NOT change $HOME, so hardcoding ~/.claude would make an isolated run read
 # the default corpus instead of the sandboxed one.
 CONFIG = pathlib.Path(os.environ.get("CLAUDE_CONFIG_DIR") or (pathlib.Path.home()/".claude"))
 
 def _resolve_mem():
-    """Mirror of engine/lib/memkit-root.sh — keep the two in step.
+    """Mirror of engine/lib/raememberit-root.sh — keep the two in step.
 
     The corpus is a SIBLING of the config dir, not inside it: Claude Code treats any path inside a
     `.claude` directory as a sensitive file needing per-file approval, and an explicit allow rule
@@ -33,19 +33,19 @@ def _resolve_mem():
     every memory write. An existing in-config corpus is still honoured, so upgrades do not move
     anyone's files.
     """
-    env = os.environ.get("MEMKIT_MEMORY_DIR")
+    env = os.environ.get("RAEMEMBERIT_MEMORY_DIR")
     if env:
         return pathlib.Path(env)
     legacy = CONFIG/"memory"
     for d in ("feedback", "project", "reference"):
         if any((legacy/d).glob("*.md")):
             return legacy
-    return CONFIG.parent/"memkit-memory"
+    return CONFIG.parent/"raememberit-memory"
 
 MEM = _resolve_mem()
 DIRS   = ["feedback", "project", "reference"]
 NATIVE = sorted((CONFIG/"projects").glob("*/memory"))
-QUERIES = pathlib.Path(os.environ.get("MEMKIT_QUERIES") or (MEM/"eval/queries.json"))
+QUERIES = pathlib.Path(os.environ.get("RAEMEMBERIT_QUERIES") or (MEM/"eval/queries.json"))
 
 def load_docs():
     docs = {}

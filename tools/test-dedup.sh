@@ -11,7 +11,7 @@
 #   run_eval.py --health --strict-dupes           refuses the corpus AFTER a bad write
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-W="${TMPDIR:-/tmp}/memkit-dedup.$$"
+W="${TMPDIR:-/tmp}/raememberit-dedup.$$"
 export CLAUDE_CONFIG_DIR="$W"
 mkdir -p "$W/memory"/{feedback,project,reference,interactions,eval}
 trap 'rm -rf "$W"' EXIT

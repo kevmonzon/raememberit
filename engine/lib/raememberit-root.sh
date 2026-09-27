@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Shared root resolution for every memkit hook and script. Source it; do not execute it.
+# Shared root resolution for every raememberit hook and script. Source it; do not execute it.
 #
-#   MEMKIT_CONFIG  the active Claude Code config dir
-#   MEMKIT_MEM     the corpus root
+#   RAEMEMBERIT_CONFIG  the active Claude Code config dir
+#   RAEMEMBERIT_MEM     the corpus root
 #
 # WHY CLAUDE_CONFIG_DIR AND NOT ~/.claude: CLAUDE_CONFIG_DIR relocates the whole config, but it
 # does NOT change $HOME. A hook hardcoding ~/.claude keeps writing the DEFAULT corpus even when the
@@ -19,16 +19,16 @@
 #   inside `.claude`.
 #
 # Resolution order:
-#   1. $MEMKIT_MEMORY_DIR                  explicit override, always wins
+#   1. $RAEMEMBERIT_MEMORY_DIR                  explicit override, always wins
 #   2. <config>/memory                     LEGACY layout, used only if it already holds memories
-#   3. <config-parent>/memkit-memory       the default for a new install
-MEMKIT_CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-if [ -n "${MEMKIT_MEMORY_DIR:-}" ]; then
-  MEMKIT_MEM="$MEMKIT_MEMORY_DIR"
-elif [ -n "$(find "$MEMKIT_CONFIG/memory/feedback" "$MEMKIT_CONFIG/memory/project" \
-                  "$MEMKIT_CONFIG/memory/reference" -name '*.md' 2>/dev/null | head -1 || true)" ]; then
-  MEMKIT_MEM="$MEMKIT_CONFIG/memory"        # respect an existing in-config corpus
+#   3. <config-parent>/raememberit-memory       the default for a new install
+RAEMEMBERIT_CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+if [ -n "${RAEMEMBERIT_MEMORY_DIR:-}" ]; then
+  RAEMEMBERIT_MEM="$RAEMEMBERIT_MEMORY_DIR"
+elif [ -n "$(find "$RAEMEMBERIT_CONFIG/memory/feedback" "$RAEMEMBERIT_CONFIG/memory/project" \
+                  "$RAEMEMBERIT_CONFIG/memory/reference" -name '*.md' 2>/dev/null | head -1 || true)" ]; then
+  RAEMEMBERIT_MEM="$RAEMEMBERIT_CONFIG/memory"        # respect an existing in-config corpus
 else
-  MEMKIT_MEM="$(dirname "$MEMKIT_CONFIG")/memkit-memory"
+  RAEMEMBERIT_MEM="$(dirname "$RAEMEMBERIT_CONFIG")/raememberit-memory"
 fi
-export MEMKIT_CONFIG MEMKIT_MEM
+export RAEMEMBERIT_CONFIG RAEMEMBERIT_MEM

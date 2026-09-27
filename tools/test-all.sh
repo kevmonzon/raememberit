@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run every memkit test. This is what CI runs and what you run before a commit.
+# Run every raememberit test. This is what CI runs and what you run before a commit.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 rc=0

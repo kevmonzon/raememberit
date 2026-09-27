@@ -1,5 +1,5 @@
 {
-  "_comment": "memkit hook wiring. The installer MERGES this into an existing settings file; it never replaces one. Every path uses ${CLAUDE_CONFIG_DIR:-$HOME/.claude} so the same wiring works in a default install and in an isolated sandbox with no rewriting.",
+  "_comment": "raememberit hook wiring. The installer MERGES this into an existing settings file; it never replaces one. Every path uses ${CLAUDE_CONFIG_DIR:-$HOME/.claude} so the same wiring works in a default install and in an isolated sandbox with no rewriting.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memkit/engine/hooks/skillmine-nag.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/skillmine-nag.sh",
             "timeout": 5
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memkit/engine/hooks/inject-memory.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/inject-memory.sh",
             "timeout": 5
           }
         ]
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memkit/engine/hooks/precompact-notice.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/precompact-notice.sh",
             "timeout": 5
           }
         ]
@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memkit/engine/hooks/rearm-inject.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/rearm-inject.sh",
             "timeout": 5
           }
         ]
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memkit/engine/hooks/require-log.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/require-log.sh",
             "timeout": 5
           }
         ]
@@ -66,12 +66,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memkit/engine/hooks/close-log.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/close-log.sh",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memkit/engine/hooks/rearm-inject.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/rearm-inject.sh",
             "timeout": 5
           }
         ]
@@ -81,7 +81,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memkit/engine/hooks/rebuild-index-hook.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/rebuild-index-hook.sh",
             "timeout": 30
           }
         ]

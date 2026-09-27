@@ -6,7 +6,7 @@ not contain:
 
 | Job | Supplied by |
 |---|---|
-| Who the assistant is addressing | `MEMKIT_USER` in `profile.env` → fills the `{{USER}}` slot |
+| Who the assistant is addressing | `RAEMEMBERIT_USER` in `profile.env` → fills the `{{USER}}` slot |
 | Persona, if any | `persona.md`, appended to the installed instruction fragment |
 | Domain vocabulary for recall expansion | `vocabulary.txt` |
 | Extra standing rules beyond the starter set | `feedback/*.md` |

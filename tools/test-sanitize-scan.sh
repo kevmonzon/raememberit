@@ -13,7 +13,7 @@
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCAN="$ROOT/tools/sanitize-scan.sh"
-WORK="${TMPDIR:-/tmp}/memkit-scantest.$$"
+WORK="${TMPDIR:-/tmp}/raememberit-scantest.$$"
 mkdir -p "$WORK/repo/tools"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -68,10 +68,10 @@ echo "=== additivity: a private list must EXTEND the shapes, never replace them 
 # invented term — proves the mechanism without naming anything real
 printf 'FAIL\tZZQQ_PLACEHOLDER_TERM\tinvented probe term\n' > "$WORK/private.txt"
 printf 'ZZQQ_PLACEHOLDER_TERM\n' > "$WORK/repo/probe.md"
-check "private rule blocks"                1 env MEMKIT_DENYLIST="$WORK/private.txt" "$S"
+check "private rule blocks"                1 env RAEMEMBERIT_DENYLIST="$WORK/private.txt" "$S"
 printf 'tok: %s\n' 'gh''p_0000000000000000000A' > "$WORK/repo/probe.md"
 check "shape rule STILL blocks with a private list loaded" \
-                                           1 env MEMKIT_DENYLIST="$WORK/private.txt" "$S"
+                                           1 env RAEMEMBERIT_DENYLIST="$WORK/private.txt" "$S"
 rm -f "$WORK/repo/probe.md"
 
 echo "─────"

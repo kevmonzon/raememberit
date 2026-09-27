@@ -10,12 +10,12 @@
 # reference memories are POINTERS, pulled in only when a topic arises.
 #
 #   bash engine/rebuild-index.sh            # operates on ${CLAUDE_CONFIG_DIR:-~/.claude}/memory
-#   MEMKIT_MEMORY_DIR=/path bash ...        # or an explicit corpus
+#   RAEMEMBERIT_MEMORY_DIR=/path bash ...        # or an explicit corpus
 set -euo pipefail
-. "$(dirname "$0")/lib/memkit-root.sh"
-cd "$MEMKIT_MEM" || { echo "rebuild-index: no corpus at $MEMKIT_MEM" >&2; exit 1; }
+. "$(dirname "$0")/lib/raememberit-root.sh"
+cd "$RAEMEMBERIT_MEM" || { echo "rebuild-index: no corpus at $RAEMEMBERIT_MEM" >&2; exit 1; }
 
-RECENT_N="${MEMKIT_RECENT_N:-8}"   # how many latest interaction logs to surface
+RECENT_N="${RAEMEMBERIT_RECENT_N:-8}"   # how many latest interaction logs to surface
 
 get_name() { awk 'NR<=6 && /^name:/{sub(/^name:[ ]*/,""); gsub(/^"|"$/,""); print; exit}' "$1"; }
 get_desc() {

@@ -1,10 +1,10 @@
-<!-- memkit — paste into your CLAUDE.md, or keep it as a separate file and reference it.
+<!-- raememberit — paste into your CLAUDE.md, or keep it as a separate file and reference it.
      This is a FRAGMENT. It is not a replacement for your own instructions. -->
 
 ## Memory
 
 A durable memory corpus sits **beside** your Claude Code config directory — its path is published
-as `$MEMKIT_MEMORY_DIR`. It has two tiers, because context injected into every prompt is the
+as `$RAEMEMBERIT_MEMORY_DIR`. It has two tiers, because context injected into every prompt is the
 scarcest resource here:
 
 - **Always-on** — `feedback/` standing rules, injected automatically into every context.
@@ -32,14 +32,14 @@ memory write.
 | Session start | if enough new interaction logs have accumulated, a pattern sweep is *offered* — never run automatically |
 | Before compaction | a reminder to capture durable memory first |
 | Session end | both indexes are regenerated from frontmatter |
-| Session end, no interaction log today | a **reminder**. Set `MEMKIT_REQUIRE_LOG=strict` to make it block instead, or `off` to silence it |
+| Session end, no interaction log today | a **reminder**. Set `RAEMEMBERIT_REQUIRE_LOG=strict` to make it block instead, or `off` to silence it |
 
 ### One thing that surprises everyone once
 
 Claude Code refuses to write outside its working directory without permission, so a `/learn` can
 appear to do nothing while it asks. The installer already adds an allow rule for the corpus, so this
 should not bite — but if it does, the rule to add is `Edit(<corpus path>/**)`, and the corpus path
-is in `$MEMKIT_MEMORY_DIR`.
+is in `$RAEMEMBERIT_MEMORY_DIR`.
 
 ### Never hand-edit the indexes
 
@@ -47,5 +47,5 @@ is in `$MEMKIT_MEMORY_DIR`.
 Edit the memory, then:
 
 ```bash
-bash memkit/engine/rebuild-index.sh
+bash raememberit/engine/rebuild-index.sh
 ```

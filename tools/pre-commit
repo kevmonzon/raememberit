@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# memkit pre-commit — refuse to stage identifying or secret-shaped content.
+# raememberit pre-commit — refuse to stage identifying or secret-shaped content.
 # Installed by tools/install-hooks.sh. Bypass only with a deliberate --no-verify.
 set -uo pipefail
 ROOT="$(git rev-parse --show-toplevel)"

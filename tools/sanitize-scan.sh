@@ -18,7 +18,7 @@
 #
 # Pattern resolution — ADDITIVE, deliberately:
 #   base:  tools/denylist.example.txt          (universal secret shapes; always loaded)
-#   plus:  $MEMKIT_DENYLIST or .denylist.local.txt   (private vocabulary, if present)
+#   plus:  $RAEMEMBERIT_DENYLIST or .denylist.local.txt   (private vocabulary, if present)
 #   or:    --patterns FILE                     (escape hatch: use ONLY that file)
 # The private list EXTENDS the shapes; it must never replace them, or enabling the stronger
 # internal gate would silently drop every secret-shape rule. A self-test asserts this.
@@ -48,7 +48,7 @@ trap 'rm -f "$TMP".*' EXIT
 
 EXAMPLE="$ROOT/tools/denylist.example.txt"
 PRIVATE=""
-if [ -n "${MEMKIT_DENYLIST:-}" ] && [ -f "${MEMKIT_DENYLIST}" ]; then PRIVATE="$MEMKIT_DENYLIST"
+if [ -n "${RAEMEMBERIT_DENYLIST:-}" ] && [ -f "${RAEMEMBERIT_DENYLIST}" ]; then PRIVATE="$RAEMEMBERIT_DENYLIST"
 elif [ -f "$ROOT/.denylist.local.txt" ];                        then PRIVATE="$ROOT/.denylist.local.txt"
 fi
 

@@ -5,10 +5,10 @@
 # This hook is here because the upstream README documented it while no such hook existed in any
 # settings file (found 2026-09-27). Documenting a hook is not having one.
 set -uo pipefail
-. "$(dirname "$0")/../lib/memkit-root.sh"
-THRESH="${MEMKIT_SWEEP_THRESHOLD:-15}"
-MARK="$MEMKIT_MEM/.last-sweep"
-D="$MEMKIT_MEM/interactions"
+. "$(dirname "$0")/../lib/raememberit-root.sh"
+THRESH="${RAEMEMBERIT_SWEEP_THRESHOLD:-15}"
+MARK="$RAEMEMBERIT_MEM/.last-sweep"
+D="$RAEMEMBERIT_MEM/interactions"
 [ -d "$D" ] || exit 0
 if [ -f "$MARK" ]; then N=$(find "$D" -name '*.md' -newer "$MARK" 2>/dev/null | wc -l | tr -d ' ')
 else                    N=$(find "$D" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')

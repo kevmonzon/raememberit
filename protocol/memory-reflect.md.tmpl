@@ -8,7 +8,7 @@ description: Use at end of session or before context compaction — captures the
 Structured session reflection: capture what this conversation produced, before it is gone.
 
 ```bash
-MEM="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memory"
+MEM="{{MEM}}"     # the corpus; filled in at install time
 ```
 
 If `/learn` has been doing its job, this sweep should be boring — most durable facts are already

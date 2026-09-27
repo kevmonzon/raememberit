@@ -1,4 +1,4 @@
-# memkit
+# raememberit
 
 An opinionated memory discipline for [Claude Code](https://claude.com/claude-code): a
 two-tier context budget, indexes generated from frontmatter, hooks that make capture
@@ -54,12 +54,12 @@ keeps writing the default corpus even when the session is pointed elsewhere.
 
 | Variable | Default | Effect |
 |---|---|---|
-| `MEMKIT_REQUIRE_LOG` | `warn` | `warn` reminds and allows the session to end · `strict` blocks it · `off` silent |
-| `MEMKIT_SWEEP_THRESHOLD` | `15` | new interaction logs before a pattern sweep is offered |
-| `MEMKIT_RECENT_N` | `8` | interaction logs surfaced in the always-on index |
-| `MEMKIT_MEMORY_DIR` | `<config>/memory` | corpus location override |
+| `RAEMEMBERIT_REQUIRE_LOG` | `warn` | `warn` reminds and allows the session to end · `strict` blocks it · `off` silent |
+| `RAEMEMBERIT_SWEEP_THRESHOLD` | `15` | new interaction logs before a pattern sweep is offered |
+| `RAEMEMBERIT_RECENT_N` | `8` | interaction logs surfaced in the always-on index |
+| `RAEMEMBERIT_MEMORY_DIR` | `<config>/memory` | corpus location override |
 
-`MEMKIT_REQUIRE_LOG` defaults to **warn**, not strict. The upstream single-user setup blocked
+`RAEMEMBERIT_REQUIRE_LOG` defaults to **warn**, not strict. The upstream single-user setup blocked
 the stop; that is a reasonable choice for its author and a hostile default for anyone else — a
 hook that refuses to let someone end their session is the fastest route to the kit being
 uninstalled.
@@ -84,6 +84,21 @@ disclosure it was written to prevent — so it is not in here.
 The gate treats **scanning zero files as an error, not a pass**, and carries no file
 exclusions: an excluded file is a blind spot, and a gate with blind spots is decoration.
 
+## Trying it
+
+If you were asked to pilot this, start here:
+
+| | |
+|---|---|
+| **`docs/PILOT.md`** | what it is, what we want to learn, what is already known to be rough, how to stop |
+| **`docs/QUICKSTART.md`** | fifteen minutes, in an isolated config directory that leaves your normal setup untouched |
+| **`docs/pilot-feedback.md`** | short form to send back — blanks are fine |
+
+**Integrating this with a Claude Code setup you already have is a separate conversation** and is
+deliberately not covered yet. Pilot it in a clean config directory.
+
+## Install
+
 ## Install
 
 ```bash
@@ -97,7 +112,7 @@ replacing it, never overwrites an existing corpus, and never touches credentials
 
 ### Where the corpus lives, and why it is not in the config directory
 
-Beside it — the path is published as `env.MEMKIT_MEMORY_DIR`. Claude Code classifies any path inside
+Beside it — the path is published as `env.RAEMEMBERIT_MEMORY_DIR`. Claude Code classifies any path inside
 a `.claude` directory as a **sensitive file** requiring per-file approval, and an explicit
 `Edit(<config>/memory/**)` allow rule does **not** override that gate (tested; still refused). A
 corpus inside the config directory therefore means a permission prompt on every single memory write
@@ -111,7 +126,7 @@ is honoured on upgrade, with a warning, so nobody's files get moved.
 tools/test-all.sh
 ```
 
-53 assertions across the sanitization gate, the duplicate-prevention loop, and a full
+65 assertions across the sanitization gate, the duplicate-prevention loop, and a full
 install-then-reinstall cycle — plus a frozen retrieval baseline for the shipped starter corpus
 (`starter/baseline.json`: literal 8/12, expanded 12/12, which is the measured value of the recall
 command's query-expansion step).
@@ -142,6 +157,18 @@ the path-based route completely but breaks authentication, so it is not recommen
 
 A test that reads the thing it is isolating from has proven nothing.
 
+## Uninstall
+
+```bash
+./uninstall.sh          # removes the tooling, KEEPS your memories
+./uninstall.sh --purge  # also deletes them, after asking you to type DELETE
+```
+
+It removes only its own hooks, commands, permission rules and env entry. Your settings, your own
+hooks and your notes are untouched — asserted, not merely promised. Memories are plain markdown and
+stay readable with this tool gone.
+
 ## License
+
 
 MIT — see `LICENSE`. The copyright holder is unset pending the first public push.

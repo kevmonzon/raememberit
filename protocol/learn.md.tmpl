@@ -11,7 +11,7 @@ The end-of-session sweep loses nuance: by then you remember *that* you were corr
 sentence that corrected you. This command exists so capture costs seconds and can happen inline.
 
 ```bash
-MEM="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/memory"
+MEM="{{MEM}}"     # the corpus; filled in at install time
 ```
 
 ## Usage
