@@ -113,6 +113,12 @@ deliberately not covered yet. Pilot it in a clean config directory.
 ./install.sh --dry-run                    # say what would change, change nothing
 ```
 
+A fresh interactive install runs **guided**: it surveys what it found, warns if you already have
+memory hooks of your own (adopting alongside them doubles the work, and the installer will not remove
+them for you), shows what it is about to change, walks you through the first `recall` → `learn` → recall
+round trip, explains what each hook does to your session, and tells you how to uninstall before you
+need to. `--no-guided` skips it; a re-run is terse by default.
+
 Idempotent: re-run it to upgrade. It **merges** hooks into an existing settings file rather than
 replacing it, never overwrites an existing corpus, and never touches credentials.
 
@@ -168,7 +174,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-102 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+112 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

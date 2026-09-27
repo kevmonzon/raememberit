@@ -153,6 +153,33 @@ ckt "the other four were not skipped"             "grep -q '1 left alone' '$T/lo
 ckt "--force-commands overwrites it"    "! grep -q 'local edit that must survive' '$T/commands/learn.md'"
 ckt "and says it is doing so"           "grep -q 'force-commands given' '$T/log4'"
 
+echo "=== guided mode: onboards, warns about predecessor hooks, never hangs ==="
+# The predecessor-hook warning is the highest-value thing guided mode does: adopting this into a setup
+# that already has memory hooks doubles everything, and the installer cannot safely remove them.
+G="$T-guided"; rm -rf "$G"; mkdir -p "$G"
+cat > "$G/settings.json" <<'J'
+{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"cat ~/.claude/memory/MEMORY.md"}]}],
+          "SessionEnd":[{"matcher":"","hooks":[{"type":"command","command":"bash ~/.claude/memory/rebuild-index.sh"}]}]}}
+J
+"$ROOT/install.sh" --config-dir "$G" --profile default --guided >"$G.log" 2>&1
+ck  "guided install exits 0 without a terminal" "$?" "0"
+ckt "warns about predecessor hooks"             "grep -q 'memory hooks of your own on' '$G.log'"
+ckt "names the events it found"                 "grep -qE 'own on:.*(UserPromptSubmit|SessionEnd)' '$G.log'"
+ckt "explains the consequence, not just the fact" "grep -q 'injected twice' '$G.log'"
+ckt "walks the first loop"                      "grep -q 'first loop' '$G.log'"
+ckt "says how to get out"                       "grep -q 'uninstall.sh' '$G.log'"
+ckt "explains the session-end reminder"         "grep -q 'RAEMEMBERIT_REQUIRE_LOG=strict' '$G.log'"
+ckt "does NOT write to any CLAUDE.md unasked"   "! test -f '$G/CLAUDE.md'"
+
+G2="$T-guided-clean"; rm -rf "$G2"
+"$ROOT/install.sh" --config-dir "$G2" --profile default --guided >"$G2.log" 2>&1
+ckt "clean config gets no predecessor warning"  "grep -q 'no memory hooks of your own' '$G2.log'"
+
+# a re-run must not re-onboard someone who has already been onboarded
+"$ROOT/install.sh" --config-dir "$G2" --profile default >"$G2.log2" 2>&1
+ckt "a plain re-run stays terse"                "! grep -q 'first loop' '$G2.log2'"
+rm -rf "$G" "$G2" "$G.log" "$G2.log" "$G2.log2"
+
 echo "=== UNINSTALL leaves their setup as it was, and keeps their memories ==="
 "$ROOT/uninstall.sh" --config-dir "$T" >"$T/unlog" 2>&1
 ck  "uninstall exited 0" "$?" "0"

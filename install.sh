@@ -5,6 +5,12 @@
 #   ./install.sh --profile example --user Alex
 #   ./install.sh --config-dir ~/sandbox/.claude    # a throwaway target
 #   ./install.sh --dry-run                         # say what would change, change nothing
+#   ./install.sh --guided | --no-guided            # walk me through it / just install
+#
+# GUIDED MODE is on by default for a fresh interactive install and off otherwise (a re-run, or
+# no terminal). It is the onboarding: a pilot who has to read a document first is a pilot who
+# starts late or not at all. It pauses at each step that changes something, shows what it is
+# about to do, and never writes to your CLAUDE.md unasked.
 #   ./install.sh --force                           # also top up an existing corpus scaffold
 #   ./install.sh --force-commands                  # also overwrite commands YOU have edited
 #
@@ -24,13 +30,44 @@ set -euo pipefail
 
 SRC="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-PROFILE="default"; USERNAME=""; FORCE=0; FORCECMD=0; DRY=0
+PROFILE="default"; USERNAME=""; FORCE=0; FORCECMD=0; DRY=0; GUIDED=auto
 
 say()  { printf '\033[1;36m▸ %s\033[0m\n' "$*"; }
 ok()   { printf '  \033[1;32m✓\033[0m %s\n' "$*"; }
 warn() { printf '  \033[1;33m!\033[0m %s\n' "$*"; }
 die()  { printf '  \033[1;31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 run()  { if [ "$DRY" = 1 ]; then printf '  would: %s\n' "$*"; else "$@"; fi; }
+
+# ── guided-mode plumbing ───────────────────────────────────────────────────────────────
+interactive() { [ -t 0 ] && [ -t 1 ]; }
+step()  { printf '\n\033[1m── %s\033[0m\n' "$*"; }
+note()  { printf '   %s\n' "$*"; }
+pause() { # only ever pauses when someone is actually there to read it
+  [ "$GUIDED" = 1 ] || return 0
+  interactive || return 0
+  printf '\n   \033[2m[Enter to continue]\033[0m '; read -r _ </dev/tty 2>/dev/null || true; printf '\n'
+}
+confirm() { # confirm "question"  -> 0 yes, 1 no. Non-interactive answers yes, and says so.
+  if [ "$GUIDED" != 1 ] || ! interactive; then return 0; fi
+  printf '   %s [y/N] ' "$1"; read -r r </dev/tty 2>/dev/null || r=y
+  case "$r" in [yY]*) return 0 ;; *) return 1 ;; esac
+}
+
+# Predecessor memory hooks: the case that silently doubles everything. Detected by what they
+# reference, because that is the only reliable signature — names and comments vary.
+find_predecessor_hooks() {
+  local f found=""
+  for f in "$TARGET/settings.json" "$TARGET/settings.local.json"; do
+    [ -f "$f" ] || continue
+    found="$found$(jq -r '
+      (.hooks // {}) | to_entries[] | .key as $ev | .value[]? | .hooks[]? | .command // ""
+      | select(test("memory/MEMORY\\.md|memory/rebuild-index|memory/interactions"))
+      | select(test("raememberit") | not)
+      | "\($ev)"' "$f" 2>/dev/null)
+"
+  done
+  printf '%s' "$found" | grep -v '^$' | sort -u
+}
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -40,6 +77,8 @@ while [ $# -gt 0 ]; do
     --force)      FORCE=1; shift ;;
     --force-commands) FORCECMD=1; shift ;;
     --dry-run)    DRY=1; shift ;;
+    --guided)     GUIDED=1; shift ;;
+    --no-guided)  GUIDED=0; shift ;;
     -h|--help)    sed -n '2,20p' "$0"; exit 0 ;;
     *)            die "unknown option: $1" ;;
   esac
@@ -50,6 +89,11 @@ say "Preflight"
 command -v jq      >/dev/null 2>&1 || die "jq is required (hooks parse their stdin with it). brew install jq"
 command -v python3 >/dev/null 2>&1 || die "python3 is required (settings merge, eval harness)"
 ok "jq $(jq --version 2>/dev/null) · python3 $(python3 -V 2>&1 | cut -d' ' -f2)"
+
+# auto: guide a fresh interactive install; stay quiet for a re-run or a non-terminal
+if [ "$GUIDED" = auto ]; then
+  if interactive && [ ! -d "$TARGET/raememberit" ]; then GUIDED=1; else GUIDED=0; fi
+fi
 [ -d "$SRC/engine" ] || die "run this from a raememberit checkout (no engine/ next to install.sh)"
 
 # ── resolve the profile ─────────────────────────────────────────────────────────────
@@ -74,6 +118,36 @@ ok "$(basename "$PDIR") · addressee \"$PUSER\""
 [ -f "$PDIR/persona.md" ] && ok "persona supplied" || ok "no persona (default)"
 
 # ── target ──────────────────────────────────────────────────────────────────────────
+if [ "$GUIDED" = 1 ]; then
+  step "What this is about to do"
+  note "raememberit is a memory discipline: two commands you will use daily (learn, recall), a few"
+  note "hooks that make capture involuntary, and a corpus of plain markdown you own."
+  note ""
+  note "Everything lands inside $TARGET, so your config stays one copy-pasteable unit."
+  note "Nothing is written to your CLAUDE.md. Your memories are never overwritten."
+  note "To undo all of it later:  ./uninstall.sh   (your memories are kept by default)"
+  pause
+
+  step "What I found"
+  if [ -d "$TARGET/raememberit" ]; then note "· raememberit is already installed here — this is an upgrade"
+  else note "· no previous install"; fi
+  if [ -n "$(find "$TARGET/memory/feedback" "$TARGET/memory/project" "$TARGET/memory/reference" -name '*.md' 2>/dev/null | head -1 || true)" ]
+  then note "· an existing memory corpus — it will be left completely alone"
+  else note "· no corpus yet — I will scaffold one and seed some starter rules"; fi
+  PRED=$(find_predecessor_hooks || true)
+  if [ -n "$PRED" ]; then
+    printf '\n'
+    warn "You already have memory hooks of your own on: $(printf '%s' "$PRED" | tr '\n' ' ')"
+    note "  Those will keep running ALONGSIDE the ones I add, which means double work:"
+    note "  the index injected twice, a session-end marker written twice, and so on."
+    note "  I do not remove them, because I cannot tell a hook you want from one I am replacing."
+    note "  After this finishes, compare them and drop whichever you do not want."
+  else
+    note "· no memory hooks of your own to collide with"
+  fi
+  pause
+fi
+
 say "Target"
 ok "$TARGET"
 [ "$TARGET" = "$SRC" ] && die "refusing to install into the checkout itself"
@@ -267,6 +341,7 @@ if [ "$DRY" = 1 ]; then printf '  would: rebuild the indexes and verify\n'; else
 fi
 
 say "Done"
+if [ "$GUIDED" != 1 ]; then
 cat <<EOF
   Next:
     1. Paste $TARGET/raememberit/INSTRUCTIONS-fragment.md into your CLAUDE.md (or reference it).
@@ -277,3 +352,69 @@ cat <<EOF
     3. Try it:  /learn something you just worked out   then   /recall that topic
   Re-run this installer any time; it upgrades in place and never touches your memories.
 EOF
+exit 0
+fi
+
+# ── guided walkthrough ─────────────────────────────────────────────────────────────────
+step "One thing to add yourself"
+note "I wrote an instructions fragment but did NOT touch your CLAUDE.md:"
+note "  $TARGET/raememberit/INSTRUCTIONS-fragment.md"
+note ""
+note "It tells Claude the corpus exists and when to use the two commands. Without it they still"
+note "work when you type them, but they will not fire on their own — which is most of the value."
+if confirm "Append it to a CLAUDE.md now?"; then
+  printf '   path to your CLAUDE.md [skip]: '; read -r cmd_path </dev/tty 2>/dev/null || cmd_path=""
+  if [ -n "$cmd_path" ] && [ -f "$cmd_path" ]; then
+    printf '\n' >> "$cmd_path"; cat "$TARGET/raememberit/INSTRUCTIONS-fragment.md" >> "$cmd_path"
+    ok "appended to $cmd_path"
+  else note "skipped — paste it in whenever you like"; fi
+else note "skipped — the fragment is there when you want it"; fi
+pause
+
+step "Your first loop — do this now, it takes two minutes"
+note "1. Start Claude, then look something up that already exists:"
+note ""
+note "      /recall tail exit code"
+note ""
+note "   You should get a rule about \`| tail && echo OK\` reporting success over a failing build."
+note "   If you get \"no prior memory\", something is wrong — please say so."
+note ""
+note "2. Then write something of your own. Pick a real thing you worked out recently,"
+note "   not a test — the point is to see whether it is worth keeping:"
+note ""
+note "      /learn the staging deploy needs the VPN even though the runbook omits it"
+note ""
+note "   Watch it search for an existing memory BEFORE writing. That step is the whole"
+note "   discipline; if it writes blindly, that is a bug worth reporting."
+note ""
+note "3. Quit, start again, and recall that topic. Written in one session, found in the next —"
+note "   that round trip is the product. Everything else is plumbing."
+pause
+
+step "What the hooks will do to your session"
+note "· every new context   the always-on index is injected once, then suppressed until it resets"
+note "· session start       if enough logs have piled up, a pattern sweep is OFFERED, never run"
+note "· before compaction   a nudge to capture memory first"
+note "· session end         both indexes regenerate from frontmatter"
+note "· session end, no log today   a reminder"
+note ""
+note "That last one surprises people. Set RAEMEMBERIT_REQUIRE_LOG=strict in settings.json to make"
+note "it BLOCK the session from ending instead, or =off to silence it. Default is a reminder."
+pause
+
+step "If you want out"
+note "  ./uninstall.sh            removes the tooling, KEEPS your memories"
+note "  ./uninstall.sh --purge    also deletes them, after making you type DELETE"
+note ""
+note "It removes only its own hooks, commands and rules. Your settings and your own hooks survive."
+pause
+
+step "Telling us how it went"
+note "The single most useful thing you can report is the first moment you were confused —"
+note "what you expected, and what happened instead. Write that down while it is fresh; it"
+note "evaporates within a day."
+note ""
+note "Short form to fill in:  docs/pilot-feedback.md"
+note "Negative findings are the point. A week of \"this did nothing for me\" is a useful week."
+printf '\n'
+ok "Set up. Go and use it for a week."

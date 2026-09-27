@@ -12,7 +12,7 @@ being generalized; you are the first person other than its author to run it.
 
 ## What we actually want to learn
 
-Not "does it work" — there are 102 automated assertions for that, and they pass. What we cannot test
+Not "does it work" — there are 112 automated assertions for that, and they pass. What we cannot test
 is the part you are for:
 
 1. **Where do you stall?** The first minute you are confused, stop and write down what you expected.
@@ -53,6 +53,13 @@ We already know:
 - **The starter rules are opinionated** and drawn from one person's engineering experience. Delete
   any you disagree with — that is a normal use of the tool, not a rejection of it.
 - **It is not published.** Team-first, on purpose.
+
+## What the installer does for you
+
+You do not need to read `QUICKSTART.md` first. A fresh install runs **guided**: it tells you what it
+found, warns you if you already have memory hooks that would double up, shows each change before
+making it, walks you through the first loop, and tells you how to get out. The quickstart is there if
+you prefer reading, but it is no longer a prerequisite.
 
 ## Time
 
