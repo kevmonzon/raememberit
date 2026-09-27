@@ -20,6 +20,11 @@ export CLAUDE_CONFIG_DIR=~/raememberit-trial/.claude
 Keep that `export` in mind: **it is per-shell.** A new terminal without it is back to your normal
 setup, which is exactly the safety property you want.
 
+**Pick the path now and leave it there.** Credentials are keyed to the config directory's path, so
+moving or renaming it after you log in silently logs you out — you just have to `/login` again, but
+it looks like a broken install when it happens. Measured, not guessed: renaming the directory during
+development did exactly this, and moving it back restored the session.
+
 ## 2. Log in once
 
 A fresh config directory has its own credentials, so it needs its own login. Same account.
