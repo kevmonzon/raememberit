@@ -11,11 +11,18 @@
 # and a plugin-only user has none of them set, so this favours the deliberate over the default without
 # ever fighting itself.
 #
-# THE CASING IS NOT FULLY KNOWN — and this is deliberate rather than lazy. Across the 39 official
-# plugins only ONE option is ever read (`telemetry` -> CLAUDE_PLUGIN_OPTION_TELEMETRY), which is a single
-# word, so how a camelCase key like `memoryDir` is spelled — MEMORYDIR or MEMORY_DIR — is unevidenced.
-# Guessing would fail silently: a wrong name reads empty and the default takes over, which looks exactly
-# like working. So both spellings are accepted. Settle it by observing a real session, then simplify.
+# THE CASING, SETTLED. Read out of the Claude Code 2.1.274 binary rather than inferred — the official
+# marketplace reads exactly one option anywhere and it is a single word, so no plugin demonstrates what
+# happens to a camelCase key. The construction is:
+#
+#     key.replace(/[^A-Za-z0-9_]/g, "_").toUpperCase()   ->  CLAUDE_PLUGIN_OPTION_<that>
+#
+# Non-alphanumerics become underscores and the whole thing is uppercased. camelCase boundaries are NOT
+# split. So `memoryDir` is CLAUDE_PLUGIN_OPTION_MEMORYDIR — never MEMORY_DIR. This matters because a
+# wrong name here fails OPEN: it reads empty, the default takes over, and nothing looks broken.
+#
+# (There is a second route: a hook command may interpolate ${user_config.<key>} directly. Not used here
+# — the engine reads its configuration from the environment, and one mechanism is enough.)
 
 # take VAR OPTION_SUFFIX_A [OPTION_SUFFIX_B] — set VAR only if it is currently unset or empty.
 __rmi_take() {
@@ -35,12 +42,12 @@ __rmi_take() {
 }
 
 __rmi_take RAEMEMBERIT_USER          USER
-__rmi_take RAEMEMBERIT_MEMORY_DIR    MEMORYDIR MEMORY_DIR
+__rmi_take RAEMEMBERIT_MEMORY_DIR    MEMORYDIR
 __rmi_take RAEMEMBERIT_DUPES         DUPES
-__rmi_take RAEMEMBERIT_REQUIRE_LOG   REQUIRELOG REQUIRE_LOG
-__rmi_take RAEMEMBERIT_PRECOMPACT_MSG PRECOMPACTMESSAGE PRECOMPACT_MESSAGE
-__rmi_take RAEMEMBERIT_RECENT_N      RECENTN RECENT_N
-__rmi_take RAEMEMBERIT_PERSONA_FILE  PERSONAFILE PERSONA_FILE
-__rmi_take RAEMEMBERIT_VOCAB_FILE    VOCABULARYFILE VOCABULARY_FILE
+__rmi_take RAEMEMBERIT_REQUIRE_LOG   REQUIRELOG
+__rmi_take RAEMEMBERIT_PRECOMPACT_MSG PRECOMPACTMESSAGE
+__rmi_take RAEMEMBERIT_RECENT_N      RECENTN
+__rmi_take RAEMEMBERIT_PERSONA_FILE  PERSONAFILE
+__rmi_take RAEMEMBERIT_VOCAB_FILE    VOCABULARYFILE
 
 unset -f __rmi_take

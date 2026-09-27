@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "raememberit",
+  "description": "Memory discipline for Claude Code — a two-tier context budget, indexes generated from frontmatter, and hooks that make capture involuntary.",
+  "owner": {
+    "name": "raememberit"
+  },
+  "plugins": [
+    {
+      "name": "raememberit",
+      "description": "Two-tier memory for Claude Code: behavioural rules always in context, everything else on demand. Ships the engine, seven hooks, six commands and a guided /raememberit:setup. Your corpus lives outside the plugin, so an update cannot touch it.",
+      "author": {
+        "name": "raememberit"
+      },
+      "category": "productivity",
+      "source": "./plugin"
+    }
+  ]
+}

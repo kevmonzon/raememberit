@@ -140,12 +140,20 @@ case "$(b CLAUDE_PLUGIN_OPTION_MEMORYDIR=/tmp/rmi-a)" in
   /tmp/rmi-a*) ok "option MEMORYDIR reaches RAEMEMBERIT_MEMORY_DIR" ;;
   *) bad "option MEMORYDIR did not reach the engine" ;;
 esac
-# The camelCase-to-env casing is unevidenced across all 39 official plugins, so BOTH spellings are
-# accepted. If this assertion ever becomes redundant, that means the convention got confirmed.
+# The casing rule, pinned. Derived from the Claude Code binary:
+#   key.replace(/[^A-Za-z0-9_]/g,"_").toUpperCase()  ->  CLAUDE_PLUGIN_OPTION_<that>
+# So camelCase is uppercased WITHOUT being split, and the underscored spelling must NOT be honoured —
+# honouring a name the platform never sets is dead code that hides the real one.
 case "$(b CLAUDE_PLUGIN_OPTION_MEMORY_DIR=/tmp/rmi-b)" in
-  /tmp/rmi-b*) ok "the underscored spelling is accepted too (casing is unevidenced upstream)" ;;
-  *) bad "the underscored option spelling is not accepted" ;;
+  /tmp/rmi-b*) bad "honours CLAUDE_PLUGIN_OPTION_MEMORY_DIR, which the platform never sets" ;;
+  *) ok "ignores the underscored spelling — camelCase uppercases without splitting" ;;
 esac
+for key in memoryDir requireLog precompactMessage recentN personaFile vocabularyFile; do
+  derived=$(printf '%s' "$key" | sed 's/[^A-Za-z0-9_]/_/g' | tr '[:lower:]' '[:upper:]')
+  grep -q "\b$derived\b" engine/lib/raememberit-options.sh \
+    || bad "bridge does not read the derived name for $key (CLAUDE_PLUGIN_OPTION_$derived)"
+done
+ok "every option is read under the name the platform actually sets"
 case "$(b CLAUDE_PLUGIN_OPTION_DUPES=block)" in
   *"|block") ok "option DUPES reaches RAEMEMBERIT_DUPES" ;;
   *) bad "option DUPES did not reach the engine" ;;
