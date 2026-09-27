@@ -260,6 +260,45 @@ after="$(python3 -c 'import json;d=json.load(open("'"$t2"'/settings.json"));prin
                          || bad "re-running changed the rule count: $before -> $after"
 rm -rf "$(dirname "$t2")"
 
+echo "== marketplace =="
+MP=.claude-plugin/marketplace.json
+if [ ! -f "$MP" ]; then
+  bad "no $MP — a plugin cannot be installed from this repo without one"
+else
+  python3 -c 'import json; json.load(open("'"$MP"'"))' 2>/dev/null \
+    && ok "marketplace.json is valid JSON" || bad "marketplace.json is not valid JSON"
+  # A plain relative string is a legitimate source: 52 of the official marketplace's 314 entries use it,
+  # and `marketplace add <path>` resolves it to {"source":"directory"} — no network.
+  src="$(python3 -c 'import json;print(json.load(open("'"$MP"'"))["plugins"][0]["source"])')"
+  case "$src" in
+    ./*) ok "plugin source is a relative path ($src) — installs with no network" ;;
+    *)   bad "plugin source is not a relative path: $src" ;;
+  esac
+  [ -f "${src#./}/.claude-plugin/plugin.json" ] \
+    && ok "the source path contains a plugin manifest" \
+    || bad "the marketplace points at $src, which has no .claude-plugin/plugin.json"
+  python3 -c 'import json,sys
+m=json.load(open("'"$MP"'")); p=json.load(open("plugin/.claude-plugin/plugin.json"))
+sys.exit(0 if m["plugins"][0]["name"] == p["name"] else 1)' \
+    && ok "marketplace and manifest agree on the plugin name" \
+    || bad "marketplace and manifest disagree on the plugin name"
+fi
+
+echo "== the wrapper fails legibly when its version is gone =="
+# `claude plugin update` KEEPS the old version directory, so a not-yet-rewritten wrapper keeps working
+# one version behind — benign. A MISSING target is the case worth a clear message rather than a bare
+# "No such file or directory" from bash.
+sb3="$(mktemp -d)"
+mkdir -p "$sb3/root/engine"; cp -R engine/. "$sb3/root/engine/"
+CLAUDE_PLUGIN_ROOT="$sb3/root" CLAUDE_PLUGIN_DATA="$sb3/data" bash engine/hooks/place-shim.sh >/dev/null 2>&1
+rm -rf "$sb3/root"
+msg="$(bash "$sb3/data/bin/mem-write.sh" 2>&1 >/dev/null || true)"
+rc=0; bash "$sb3/data/bin/mem-write.sh" >/dev/null 2>&1 || rc=$?
+[ "$rc" = "1" ] && ok "wrapper exits 1 when its target version is gone" || bad "wrapper exit code was $rc, expected 1"
+printf '%s' "$msg" | grep -q 'Start a new session' \
+  && ok "wrapper says what to do about it" || bad "wrapper gives no actionable message"
+rm -rf "$sb3"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" = "0" ]

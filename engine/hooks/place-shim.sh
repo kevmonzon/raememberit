@@ -31,10 +31,19 @@ real="$CLAUDE_PLUGIN_ROOT/engine/mem-write.sh"
 
 [ -f "$real" ] || exit 0
 
+# MEASURED 2026-09-27: `claude plugin update` KEEPS the previous version directory, so a wrapper not
+# yet rewritten keeps working — one engine version behind, silently, until the next SessionStart. That
+# is benign. What would not be benign is the target being GONE (a future cleanup, a manual rm): the
+# wrapper would fail with a bare "No such file or directory" and nothing would say why. So it checks.
 want="#!/usr/bin/env bash
 # GENERATED each session by raememberit's place-shim.sh hook. Do not edit.
 # Stable path for the permission rule; the versioned plugin root lives on the next line only.
-exec bash \"$real\" \"\$@\""
+real=\"$real\"
+if [ ! -f \"\$real\" ]; then
+  printf 'raememberit: the plugin version this shim points at is gone:\\n  %s\\nStart a new session — the SessionStart hook repoints this file automatically.\\n' \"\$real\" >&2
+  exit 1
+fi
+exec bash \"\$real\" \"\$@\""
 
 # Idempotent: rewrite only when the content actually differs, so an unchanged session touches nothing.
 if [ ! -f "$target" ] || [ "$(cat "$target")" != "$want" ]; then

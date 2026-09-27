@@ -123,6 +123,13 @@ templates and `engine/settings.fragment.json`; `tools/test-plugin.sh` rebuilds i
 and diffs, so editing either side without rebuilding fails. Two descriptions of one mechanism is a drift
 surface and this project has been bitten by it three times.
 
+**Does an update disturb a corpus?** No — measured, not argued. `tools/test-lifecycle.sh` runs the real
+`install → update → uninstall` cycle against a throwaway config directory and asserts the corpus is
+byte-identical afterwards, mtimes included, and that memories survive an uninstall. It lives outside
+`test-all.sh` because a directory-marketplace install clones the **git** state, so it tests the last
+commit rather than the working tree, and it skips itself cleanly when the `claude` CLI is absent — a
+skip is "not measured here", never a pass.
+
 **The one thing a plugin cannot declare** is a permission rule, and its own install path carries a
 version, so a rule aimed there would die on every update. A `SessionStart` hook places a *wrapper* at
 the version-free `$CLAUDE_PLUGIN_DATA/bin/`, and the rule names that. A copy would not work: every
@@ -210,7 +217,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-165 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+171 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone
