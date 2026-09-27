@@ -6,6 +6,8 @@
 #   engine/mem-write.sh ... --update                          # allow replacing an existing file
 #   engine/mem-write.sh ... --append                          # append instead (logs only)
 #
+# $RAEMEMBERIT_DUPES = block (default) | warn | off — see the duplicate gate at the end.
+#
 # WHY A HELPER AND NOT THE WRITE TOOL: the corpus lives inside the Claude Code config directory so
 # that the whole directory stays one portable, copy-pasteable unit. Claude Code classifies any path
 # inside a `.claude` directory as a SENSITIVE FILE and the Edit/Write tools refuse it per file; an
@@ -76,7 +78,24 @@ printf '%s %s\n' "$ACT" "${FILE#$RAEMEMBERIT_MEM/}"
 
 # ---- index, then the duplicate gate ----
 bash "$(dirname "$0")/rebuild-index.sh" | sed 's/^/  /'
+
+# $RAEMEMBERIT_DUPES: `block` (default) exits 3 when the corpus holds a near-duplicate pair;
+# `warn` reports and exits 0; `off` skips the check.
+#
+# Blocking is the right default — it is what turns this corpus's most common defect into something
+# the write refuses to leave behind. But an EXISTING corpus may already contain pairs that predate
+# adoption, and then a blocking gate fails every write for reasons the writer did not cause. `warn`
+# exists for exactly that transition: keep writing, see the debt, flip to `block` once it is paid.
+DUPES="${RAEMEMBERIT_DUPES:-block}"
+[ "$DUPES" = off ] && exit 0
 if ! python3 "$(dirname "$0")/eval/run_eval.py" --health --strict-dupes >/dev/null 2>"$RAEMEMBERIT_MEM/.dupcheck"; then
+  if [ "$DUPES" = warn ]; then
+    printf '\n-- near-duplicate descriptions in the corpus (advisory):\n' >&2
+    sed 's/^/  /' "$RAEMEMBERIT_MEM/.dupcheck" >&2
+    printf '  Not blocking, because RAEMEMBERIT_DUPES=warn. Set it to `block` once these are merged.\n' >&2
+    rm -f "$RAEMEMBERIT_MEM/.dupcheck"
+    exit 0
+  fi
   printf '\n!! near-duplicate descriptions now in the corpus:\n' >&2
   sed 's/^/  /' "$RAEMEMBERIT_MEM/.dupcheck" >&2
   printf '  Merge or differentiate them. Do NOT leave this — it is the defect this corpus is most\n' >&2

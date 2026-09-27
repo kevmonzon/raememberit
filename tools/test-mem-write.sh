@@ -80,6 +80,15 @@ good trust-the-file-again "Read the live file rather than a memory describing it
 ck "duplicate description exits 3" 3 sh -c "'$MW' feedback trust-the-file-again < '$W/dup'"
 ckt "but the file was still written, so it can be merged" "[ -f '$W/memory/feedback/trust-the-file-again.md' ]"
 
+echo "=== the duplicate gate has an advisory mode, for corpora that already have debt ==="
+# A pre-existing pair must not fail every future write; that is the transition case.
+ck "warn mode reports but exits 0" 0 sh -c "RAEMEMBERIT_DUPES=warn '$MW' feedback trust-the-file --update < '$W/again'"
+ck "off mode skips the check"      0 sh -c "RAEMEMBERIT_DUPES=off  '$MW' feedback trust-the-file --update < '$W/again'"
+ck "default is still blocking"     3 sh -c "'$MW' feedback trust-the-file --update < '$W/again'"
+RAEMEMBERIT_DUPES=warn "$MW" feedback trust-the-file --update < "$W/again" > "$W/warnout" 2>&1
+if grep -q 'advisory' "$W/warnout"; then printf '  ok    %s\n' "warn mode names the pair as advisory"; pass=$((pass+1))
+else printf '  FAIL  %s\n' "warn mode did not label the report advisory"; sed 's/^/          /' "$W/warnout" | tail -4; fail=$((fail+1)); fi
+
 echo "─────"
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1
