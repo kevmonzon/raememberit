@@ -90,7 +90,10 @@ def main():
           f"Read the files, then record a verdict per candidate.\n")
     for score, sim, nh, nd, d in scored[:8]:
         rel = d["path"].relative_to(MEM)
-        flag = "  <-- LIKELY DUPLICATE" if sim >= a.threshold or nd >= 2 else ""
+        # `nd >= 2` ALONE is not evidence: two shared description words at ~0.03 token overlap is
+        # noise, and it fired on genuinely unrelated memories. A flag that cries wolf gets ignored,
+        # which costs more than a missed candidate — the ranked list is still right there to read.
+        flag = "  <-- LIKELY DUPLICATE" if sim >= a.threshold or (nd >= 2 and sim >= 0.15) else ""
         print(f"  [{score:5.2f}] {rel}{flag}")
         print(f"          desc-sim {sim:.2f} · desc-terms {nd} · body-terms {nh}")
         if d["desc"]:
