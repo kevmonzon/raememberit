@@ -53,6 +53,30 @@ sed -n '/^| Event | Matcher | Script | Timeout |/,/rebuild-index-hook/p' "$ROOT/
 if diff -q "$W/gen" "$W/doc" >/dev/null 2>&1; then ok "README hook table matches engine/settings.fragment.json"
 else bad "README hook table has drifted from the wiring" "$(diff "$W/gen" "$W/doc" | head -4)"; fi
 
+echo "=== the plugin's hooks are generated from the settings fragment, not typed twice ==="
+# Two ways to wire the same hooks — a settings fragment the standalone installer merges, and the
+# plugin's own hooks.json — is a drift surface. This project has been bitten three times by two
+# descriptions of one mechanism diverging, so one is generated from the other and this asserts it.
+if [ ! -f "$ROOT/plugin/hooks/hooks.json" ]; then
+  bad "plugin/hooks/hooks.json is missing"
+elif diff -q <(jq -S '.hooks' "$ROOT/engine/settings.fragment.json") \
+              <(jq -S '.hooks' "$ROOT/plugin/hooks/hooks.json") >/dev/null 2>&1; then
+  ok "plugin hooks.json matches engine/settings.fragment.json"
+else
+  bad "plugin hooks.json has drifted — re-run tools/gen-plugin-hooks.sh"
+fi
+if command -v claude >/dev/null 2>&1; then
+  if claude plugin validate "$ROOT/plugin" 2>&1 | grep -q "Validation passed"; then ok "plugin manifest validates"
+  else bad "plugin manifest does not validate"; fi
+else ok "claude CLI absent — manifest validation skipped"; fi
+
+missing=""
+for cmdstr in $(jq -r '.hooks[][].hooks[].command' "$ROOT/plugin/hooks/hooks.json" | sed 's|.*/hooks/||'); do
+  [ -x "$ROOT/engine/hooks/$cmdstr" ] || missing="$missing $cmdstr"
+done
+if [ -z "$missing" ]; then ok "every hook script the plugin names exists and is executable"
+else bad "plugin names hook scripts that are missing:$missing"; fi
+
 echo "=== every protocol template is installable ==="
 for f in "$ROOT/protocol"/*.md.tmpl; do
   b=$(basename "$f")

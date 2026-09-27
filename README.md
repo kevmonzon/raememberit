@@ -103,6 +103,23 @@ If you were asked to pilot this, start here:
 **Integrating this with a Claude Code setup you already have is a separate conversation** and is
 deliberately not covered yet. Pilot it in a clean config directory.
 
+## Two ways to get the hooks
+
+**As a plugin, inside your config directory.** A plugin placed at `<config>/skills/raememberit/`
+auto-loads as `raememberit@skills-dir` with **no settings entry at all** — no marketplace, no
+`pluginDirs`, no `enabledPlugins`. `plugin/` in this repo is that plugin; copy it there and the hooks
+arrive from it. `claude plugin list` will show it as loaded.
+
+`plugin/hooks/hooks.json` is **generated** from `engine/settings.fragment.json` by
+`tools/gen-plugin-hooks.sh`, and a test asserts they match — two descriptions of one mechanism is a
+drift surface, and this project has been bitten by that three times.
+
+What a plugin still **cannot** supply: permission rules and settings `env`. So the `Bash(...)` allow
+rule for the write helper, and the knobs, stay in the user's own settings — one entry each, added once.
+
+**Or merged into your settings** by `install.sh`, which is the path for anyone whose commands are
+their own.
+
 ## Install
 
 ## Install
