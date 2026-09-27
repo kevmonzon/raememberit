@@ -299,6 +299,116 @@ printf '%s' "$msg" | grep -q 'Start a new session' \
   && ok "wrapper says what to do about it" || bad "wrapper gives no actionable message"
 rm -rf "$sb3"
 
+echo "== install.sh --as-plugin: the plugin route without a marketplace =="
+# Distribution is this script, not a marketplace. A skills-dir install has NO version component in its
+# path, so the wrapper the marketplace case needs is unnecessary: the rule names the engine directly and
+# still never moves.
+t4="$(mktemp -d)/.claude"
+if bash install.sh --as-plugin --config-dir "$t4" --no-guided --user Testee >/dev/null 2>&1; then
+  ok "--as-plugin install completes"
+else
+  bad "--as-plugin install failed"
+fi
+SK="$t4/skills/raememberit"
+[ -f "$SK/.claude-plugin/plugin.json" ] && ok "places the manifest (without it, it is not a plugin)" \
+                                        || bad "no .claude-plugin/plugin.json placed"
+[ -f "$SK/hooks/hooks.json" ] && ok "places hooks.json" || bad "no hooks.json placed"
+[ -f "$SK/engine/mem-write.sh" ] && ok "places the engine" || bad "no engine placed"
+[ -f "$SK/commands/setup.md" ] && ok "places the commands" || bad "no commands placed"
+if [ -f "$t4/settings.json" ]; then
+  python3 -c 'import json,sys
+d=json.load(open("'"$t4"'/settings.json")); sys.exit(0 if not d.get("hooks") else 1)' \
+    && ok "still wires no hooks into settings" || bad "wired hooks into settings"
+  python3 -c 'import json,sys
+d=json.load(open("'"$t4"'/settings.json")); a=d.get("permissions",{}).get("allow",[])
+sys.exit(0 if any("/skills/raememberit/engine/mem-write.sh" in r for r in a) else 1)' \
+    && ok "rule names the engine directly — no wrapper needed for a skills-dir install" \
+    || bad "rule does not name the skills-dir engine"
+  python3 -c 'import json,sys
+d=json.load(open("'"$t4"'/settings.json")); a=d.get("permissions",{}).get("allow",[])
+sys.exit(1 if any("/plugins/cache/" in r for r in a) else 0)' \
+    && ok "no version component anywhere in the rules" || bad "a rule carries a version component"
+else
+  bad "--as-plugin wrote no settings.json"
+fi
+# The rule is worthless if it names something that cannot run.
+if [ -f "$SK/engine/mem-write.sh" ]; then
+  RAEMEMBERIT_MEMORY_DIR="$t4/memory" RAEMEMBERIT_DUPES=off bash "$SK/engine/mem-write.sh" reference asplugin-assert >/dev/null 2>&1 <<'EOF'
+---
+name: asplugin-assert
+description: Written through the exact path the permission rule names, because a rule pointing at something unrunnable is decoration
+metadata:
+  type: reference
+---
+Probe.
+EOF
+  [ -f "$t4/memory/reference/asplugin-assert.md" ] \
+    && ok "the path the rule names actually writes a memory" \
+    || bad "the rule names a path that cannot write"
+fi
+# An existing skills dir is someone's, possibly edited: same principle as the command manifest.
+marker="$SK/MINE.txt"; : > "$marker"
+bash install.sh --as-plugin --config-dir "$t4" --no-guided >/dev/null 2>&1 || true
+[ -f "$marker" ] && ok "a second run leaves an existing plugin directory alone" \
+                 || bad "a second run replaced the plugin directory without --force"
+bash install.sh --as-plugin --config-dir "$t4" --no-guided --force >/dev/null 2>&1 || true
+[ -f "$marker" ] && bad "--force did not replace the plugin directory" \
+                 || ok "--force replaces it"
+rm -rf "$(dirname "$t4")"
+
+echo "== the two routes must not double each other =="
+# THE SHARPEST BUG THIS SUITE CAUGHT. A standalone install wires seven hook groups into settings; a
+# plugin supplies the same ones. Doing both fires every hook twice — no error, just doubling, reachable
+# through the installer's own flags. Plugin mode therefore REMOVES raememberit's own settings hooks, and
+# standalone WARNS when a plugin is present.
+t5="$(mktemp -d)/.claude"
+mkdir -p "$t5"
+# Someone else's hook, which must survive every step below untouched.
+cat > "$t5/settings.json" <<'JSON'
+{"hooks":{"SessionStart":[{"matcher":"","hooks":[{"type":"command","command":"/usr/local/bin/not-ours.sh"}]}]}}
+JSON
+bash install.sh --config-dir "$t5" --no-guided --user Testee >/dev/null 2>&1
+n1=$(python3 -c 'import json;d=json.load(open("'"$t5"'/settings.json"));print(sum(len(v) for v in d.get("hooks",{}).values()))')
+[ "$n1" -gt 1 ] && ok "standalone wires its hooks into settings ($n1 groups)" || bad "standalone wired no hooks"
+
+out5="$(bash install.sh --as-plugin --config-dir "$t5" --no-guided 2>&1)"
+printf '%s' "$out5" | grep -q 'REMOVED from settings' \
+  && ok "--as-plugin says it removed the settings hooks" \
+  || bad "--as-plugin did not report removing the settings hooks"
+python3 -c 'import json,sys
+d=json.load(open("'"$t5"'/settings.json"))
+c=[h["command"] for a in d.get("hooks",{}).values() for g in a for h in g["hooks"]]
+sys.exit(0 if not any("raememberit" in x for x in c) else 1)' \
+  && ok "no raememberit hook remains in settings — nothing doubles" \
+  || bad "raememberit hooks remain in settings alongside the plugin: everything fires twice"
+python3 -c 'import json,sys
+d=json.load(open("'"$t5"'/settings.json"))
+c=[h["command"] for a in d.get("hooks",{}).values() for g in a for h in g["hooks"]]
+sys.exit(0 if any("not-ours.sh" in x for x in c) else 1)' \
+  && ok "someone else's hook survives the removal" \
+  || bad "removed a hook that was not ours"
+
+# And the mirror: standalone onto a config that already has the plugin must REFUSE.
+# NB capture first, grep after. Piping a long-running script into `grep -q` under `set -o pipefail`
+# fails the pipeline even when grep MATCHES: grep exits at the first hit, the script takes SIGPIPE, and
+# pipefail reports that. This cost a false FAIL here, having cost this project three before it.
+out6="$(bash install.sh --config-dir "$t5" --no-guided 2>&1)"; rc6=$?
+printf '%s' "$out6" | grep -q 'fire TWICE' \
+  && ok "standalone names the doubling when a plugin is already present" \
+  || bad "standalone is silent about an installed plugin — the doubling would go unnoticed"
+[ "$rc6" != "0" ] && ok "and refuses rather than recreating a doubled configuration" \
+                  || bad "standalone proceeded and wired the hooks back in alongside the plugin"
+python3 -c 'import json,sys
+d=json.load(open("'"$t5"'/settings.json"))
+c=[h["command"] for a in d.get("hooks",{}).values() for g in a for h in g["hooks"]]
+sys.exit(0 if not any("raememberit" in x for x in c) else 1)' \
+  && ok "settings still carry no raememberit hooks after the refusal" \
+  || bad "the refused run still modified settings"
+out7="$(bash install.sh --config-dir "$t5" --no-guided --force 2>&1)"; rc7=$?
+[ "$rc7" = "0" ] && ok "--force overrides the refusal for someone who means it" \
+                 || bad "--force did not override the refusal"
+rm -rf "$(dirname "$t5")"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" = "0" ]

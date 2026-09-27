@@ -105,8 +105,18 @@ memory hooks you already have instead of quietly running both. See `docs/ADOPTIN
 
 | | For | Carries |
 |---|---|---|
-| **`plugin/`** | anyone starting fresh | engine, hooks, six commands, the installer, the starter corpus, typed options |
-| **`install.sh`** | adopting into a setup you have customized | the same engine and hooks — and leaves your commands alone |
+| **`./install.sh --as-plugin`** | anyone starting fresh | places `plugin/` at `<config>/skills/raememberit/` — engine, hooks, six commands, starter corpus, typed options |
+| **`./install.sh`** | adopting into a setup you have customized | the same engine and hooks — and leaves your commands alone |
+
+Both routes are **this script**. There is a `marketplace.json` as well, but it exists so
+`tools/test-lifecycle.sh` can run a real install/update/uninstall cycle — the only way to prove an update
+leaves a corpus alone. Distribution is the script.
+
+**The two routes cannot be combined, and the installer enforces that.** Standalone wires seven hook
+groups into `settings.json`; the plugin supplies the same ones. Running both fires every hook twice — no
+error, just doubling. So `--as-plugin` **removes** raememberit's own hook groups from settings (yours are
+untouched), and a standalone install onto a config that already has the plugin **refuses**, naming both
+ways out. `--force` overrides it for someone who means it.
 
 They serve genuinely different cases. A plugin's commands are managed files replaced on every update,
 so it cannot carry commands whose text is *yours* — which is exactly the case this kit's own author
@@ -217,7 +227,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-171 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+190 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

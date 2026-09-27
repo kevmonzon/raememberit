@@ -8,6 +8,8 @@
 #   ./install.sh --guided | --no-guided            # walk me through it / just install
 #   ./install.sh --plugin                          # plugin already ships engine+hooks: corpus,
 #                                                  # permission rule and fragment only
+#   ./install.sh --as-plugin                       # place plugin/ at <config>/skills/raememberit/
+#                                                  # too — the plugin route, no marketplace needed
 #
 # GUIDED MODE is on by default for a fresh interactive install and off otherwise (a re-run, or
 # no terminal). It is the onboarding: someone who has to read a document first is someone who
@@ -32,7 +34,7 @@ set -euo pipefail
 
 SRC="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-USERNAME=""; PERSONA=""; VOCAB=""; FORCE=0; FORCECMD=0; DRY=0; GUIDED=auto; PLUGINMODE=0
+USERNAME=""; PERSONA=""; VOCAB=""; FORCE=0; FORCECMD=0; DRY=0; GUIDED=auto; PLUGINMODE=0; ASPLUGIN=0
 SHIM=""   # in --plugin mode, the discovered stable path of the write helper
 
 say()  { printf '\033[1;36m▸ %s\033[0m\n' "$*"; }
@@ -88,6 +90,11 @@ while [ $# -gt 0 ]; do
     # the parts a plugin cannot do for itself — seed the corpus, add the one permission rule, offer the
     # instruction fragment. Same script, same guided flow, no second implementation to drift.
     --plugin)     PLUGINMODE=1; shift ;;
+    # --as-plugin: PLACE the plugin as well, at <config>/skills/raememberit/, which auto-loads as
+    # raememberit@skills-dir with no settings entry at all. This is the plugin route without a
+    # marketplace: distribution is this script, and the install path carries NO version, so the write
+    # helper needs no wrapper — the rule can name the engine directly and still never move.
+    --as-plugin)  PLUGINMODE=1; ASPLUGIN=1; shift ;;
     -h|--help)    sed -n '2,20p' "$0"; exit 0 ;;
     *)            die "unknown option: $1" ;;
   esac
@@ -163,7 +170,23 @@ if [ "$PLUGINMODE" = 1 ]; then run mkdir -p "$TARGET"; else run mkdir -p "$TARGE
 
 # ── engine ──────────────────────────────────────────────────────────────────────────
 say "Engine"
-if [ "$PLUGINMODE" = 1 ]; then
+if [ "$ASPLUGIN" = 1 ]; then
+  SKILLDIR="$TARGET/skills/raememberit"
+  [ -d "$SRC/plugin" ] || die "no plugin/ next to install.sh — run tools/build-plugin.sh first"
+  # Never clobber a plugin directory someone has edited: same principle as the command manifest.
+  if [ -d "$SKILLDIR" ] && [ "$FORCE" != 1 ]; then
+    warn "$SKILLDIR already exists — left alone. Pass --force to replace it."
+  else
+    run rm -rf "$SKILLDIR"
+    run mkdir -p "$(dirname "$SKILLDIR")"
+    run cp -R "$SRC/plugin" "$SKILLDIR"
+    ok "plugin placed at $SKILLDIR (auto-loads as raememberit@skills-dir; no settings entry needed)"
+  fi
+  # A skills-dir install has NO version component in its path, so the wrapper that exists for the
+  # marketplace case is unnecessary here: name the engine itself and the rule still never moves.
+  SHIM="$SKILLDIR/engine/mem-write.sh"
+  ok "write helper: $SHIM (stable by construction — no version in the path)"
+elif [ "$PLUGINMODE" = 1 ]; then
   ok "skipped — the plugin ships its own engine at \${CLAUDE_PLUGIN_ROOT}/engine"
   # The permission rule must name an absolute path, and the plugin's own path carries a VERSION, so a
   # rule aimed there dies on the next update. place-shim.sh puts a wrapper at the version-free
@@ -311,6 +334,23 @@ ok "fragment written — it is YOURS to paste into CLAUDE.md; nothing was writte
 
 # ── hooks: merge, never replace ─────────────────────────────────────────────────────
 say "Hooks"
+# The mirror image of the case plugin mode strips: a standalone install wires seven hook groups into
+# settings, and a plugin sitting at <config>/skills/raememberit supplies the same ones. Nothing errors;
+# it just doubles. Name it rather than let it be discovered.
+# It REFUSES rather than warns, because a warning that scrolls past still leaves a broken config
+# behind: proceeding would wire seven groups into settings while the plugin supplies the same ones.
+# The installer already declines to clobber a command you have edited; declining to build a knowingly
+# doubled configuration is the same principle.
+if [ "$PLUGINMODE" = 0 ] && [ -f "$TARGET/skills/raememberit/hooks/hooks.json" ] && [ "$FORCE" != 1 ]; then
+  warn "a raememberit PLUGIN is also installed at $TARGET/skills/raememberit"
+  warn "It supplies these same hooks. Wiring them into settings as well makes every hook fire TWICE."
+  warn ""
+  warn "Pick one route:"
+  warn "  ./install.sh --as-plugin      keep the plugin; it supplies the hooks (removes ours from settings)"
+  warn "  rm -rf $TARGET/skills/raememberit"
+  warn "                                drop the plugin, then re-run this"
+  die  "refusing to create a doubled configuration. Pass --force to do it anyway."
+fi
 if [ "$DRY" = 1 ]; then printf '  would: merge hook wiring into %s/settings.json\n' "$TARGET"; else
 python3 - "$SRC/engine/settings.fragment.json" "$TARGET/settings.json" "$MEM" "$PLUGINMODE" "$SHIM" <<'PY'
 import json, os, sys
@@ -327,9 +367,22 @@ MARK = "/raememberit/engine/hooks/"
 def is_ours(group):
     return any(MARK in (h.get("command") or "") for h in group.get("hooks", []))
 
-replaced = added = kept = 0
-# In plugin mode the plugin's own hooks.json supplies every hook. Merging them into settings too would
-# wire each one TWICE — the doubling failure this installer exists to warn about, self-inflicted.
+replaced = added = kept = removed = 0
+
+# In plugin mode the plugin's own hooks.json supplies every hook, so settings must carry NONE of ours.
+# NOT adding them is not enough: a config that was installed standalone FIRST still has seven hook
+# groups sitting there, and the plugin's nine arrive alongside them. Measured: everything fires twice.
+# That is the exact failure this installer exists to warn about, reachable through its own flags — so
+# plugin mode REMOVES raememberit's own hook groups. Anyone else's are untouched.
+if plugin_mode:
+    for ev in list(hooks.keys()):
+        keep = [g for g in hooks[ev] if not is_ours(g)]
+        removed += len(hooks[ev]) - len(keep)
+        if keep:
+            hooks[ev] = keep
+        else:
+            del hooks[ev]
+
 for ev, groups in ([] if plugin_mode else frag["hooks"].items()):
     existing = hooks.get(ev, [])
     mine  = [g for g in existing if is_ours(g)]
@@ -369,7 +422,10 @@ for r in rules:
 
 json.dump(cur, open(set_p, "w"), indent=2); open(set_p, "a").write("\n")
 if plugin_mode:
-    print("  \033[1;32m✓\033[0m hooks left to the plugin — wiring them here as well would fire each one twice")
+    if removed:
+        print(f"  \033[1;32m✓\033[0m {removed} raememberit hook group(s) REMOVED from settings — the plugin\n      supplies them, and both together would fire every hook twice")
+    else:
+        print("  \033[1;32m✓\033[0m hooks left to the plugin — wiring them here as well would fire each one twice")
 else:
     print(f"  \033[1;32m✓\033[0m {added} raememberit hook group(s) wired · "
           f"{replaced} previous raememberit group(s) replaced · {kept} of your own hook group(s) preserved")
