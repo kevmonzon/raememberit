@@ -6,6 +6,46 @@ behind each change lives in the commit that made it — `git log` is the long fo
 Versions before `0.4.0` predate this file; their history is in `git log` and is not reconstructed
 here, because a changelog written after the fact from subject lines is a guess wearing a date.
 
+## 0.5.1
+
+One bug fix on a destructive path, and one guard against this kit's own
+characteristic failure. Both found by running the installer and uninstaller as a
+newcomer would, rather than reading them.
+
+### `uninstall.sh` never got the precedence fix the installer did
+
+`0.4.0` taught `install.sh` that a flag the caller typed beats a variable the
+environment happened to carry, after an ambient `RAEMEMBERIT_MEMORY_DIR` redirected
+a `--config-dir` install onto a live corpus. `uninstall.sh` resolved the corpus the
+old way, and nobody noticed — because uninstall only *reports* the corpus by
+default, so the wrong path was printed rather than acted on.
+
+Uninstalling a throwaway target reported `KEPT: 650 file(s)` at a real corpus while
+the target held 15. Nothing was damaged. But `--purge` deletes whatever that
+variable resolves to, so an ambient value could offer to erase a corpus the caller
+never named. The typed `DELETE` confirmation names the path, which protects
+someone who reads it and nobody who is following instructions.
+
+### The installer could report success and do nothing
+
+Pasting `INSTRUCTIONS-fragment.md` into a `CLAUDE.md` is manual on purpose — this
+installer does not edit anyone's `CLAUDE.md`. Skip it and every hook still fires,
+the corpus is still written, the indexes still rebuild, and nothing ever tells
+Claude the corpus exists: seven green steps and a no-op, which is precisely the
+failure this kit was built to detect elsewhere.
+
+It now looks for a `CLAUDE.md` that references it and says when it finds none,
+naming the paths it checked. Looked for, never enforced — a false "not referenced"
+is noise, a missed paste is silence.
+
+### Tests
+
+Nine assertions, both fixes mutation-proven by reverting them. The precedence test
+uses a **decoy** corpus and asserts it is untouched after both install and
+uninstall, so the suite proves this without going near a real one.
+
+273 assertions across seven suites, plus the lifecycle cycle outside them.
+
 ## 0.5.0
 
 Eight commits, and seven of them are the same defect at different layers: something that

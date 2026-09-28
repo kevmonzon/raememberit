@@ -1,6 +1,6 @@
 {
   "name": "raememberit",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Memory discipline for Claude Code: a two-tier context budget, indexes generated from frontmatter, and hooks that make capture involuntary.",
   "author": {
     "name": "raememberit"
