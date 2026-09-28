@@ -52,11 +52,30 @@ def load_docs():
     return docs
 
 def load_native():
+    """The native silo is cwd-KEYED, so the same filename recurs in every store.
+
+    Keying this by `f.stem` silently collapsed them: four stores each hold a `MEMORY.md`, so three
+    were overwritten and the reported corpus size was 14 where 17 files exist. A dict keyed by a
+    non-unique field does not error — it drops, and reports the smaller number as fact. Key by the
+    store as well, so a collision is impossible rather than merely unlikely.
+    """
     out = {}
     for base in NATIVE:
+        store = base.parent.name
         for f in sorted(base.glob("*.md")):
-            out[f.stem] = f.read_text(errors="replace").lower()
+            out[f"{store}/{f.stem}"] = f.read_text(errors="replace").lower()
     return out
+
+def native_text(native, stem):
+    """Content of every native memory with this stem, across all cwd-keyed stores.
+
+    Storage is keyed `store/stem` so nothing is silently overwritten, but queries address a memory
+    by stem alone — they cannot know which working directory it was written from. Resolving here
+    keeps both true: an honest count, and a lookup that does not care where the file lives.
+    """
+    hits = [v for k, v in native.items() if k.split("/", 1)[-1] == stem]
+    return "\n".join(hits)
+
 
 def _matcher(term):
     """Short terms must match on a word boundary.
@@ -93,7 +112,10 @@ def evaluate(q, docs, native, strategy):
 
     if mode == "native":
         want = q.get("expect_native", [])
-        found = [n for n in want if any(t.lower() in native.get(n, "") for t in terms) or n in native]
+        # Reachability is EXISTENCE here, not term-matching: the original expression ended in
+        # `or n in native`, which made the term test unreachable whenever the memory was present.
+        # Said plainly rather than left as dead code inside a condition.
+        found = [n for n in want if native_text(native, n)]
         r.update(passed=len(found) == len(want), detail=f"{len(found)}/{len(want)} native memories reachable")
         return r
 
