@@ -6,6 +6,61 @@ behind each change lives in the commit that made it — `git log` is the long fo
 Versions before `0.4.0` predate this file; their history is in `git log` and is not reconstructed
 here, because a changelog written after the fact from subject lines is a guess wearing a date.
 
+## 0.5.0
+
+Eight commits, and seven of them are the same defect at different layers: something that
+reported success while doing nothing. None of them errored. All of them passed.
+
+### `archive/` became a real tier
+
+Nothing read it — not `rebuild-index.sh`, not the catalog, not `/recall`. Memories moved there were
+unreachable by every documented retrieval path, which makes "archive" a quiet delete rather than a
+filing. It is now listed in `MEMORY-CATALOG.md` under its own heading: findable, visibly finished,
+and costing the always-on tier nothing.
+
+It stays out of the eval's **scored** corpus deliberately — finished work should not be marked for
+retrieval quality — but archived names are valid **link targets**, because *not scored* and *not a
+valid target* are different claims. Conflating them turned working `[[links]]` into reported
+danglings the moment anything was archived.
+
+**Ordering matters:** install before moving anything to `archive/`. The `SessionEnd` hook runs the
+*installed* `rebuild-index.sh`, so an older copy un-indexes the directory on the next session end.
+
+### Instruments that were lying
+
+- **The audit's hook check** named `settings.json`, which two of the three install routes leave
+  empty by design. An audit following it concluded the memory system was unwired — a confident false
+  negative, produced by the check written to prevent confident false negatives.
+- **The eval undercounted the native silo**, keying a dict by filename stem so four stores each
+  holding a `MEMORY.md` collapsed into one: 17 files reported as 14. A dict keyed on a non-unique
+  field does not error; it drops, and prints the smaller number as fact.
+- **The staleness check counted ordinary English.** A case-insensitive body scan for SHIPPED /
+  DONE / merged / closed matched *"assumes Phases 0–3 done"* and *"PR closed unmerged"*, reporting
+  40 of 65 project memories as finished where the number worth acting on was 3 — and recommending a
+  sweep that would have buried twelve in-flight tickets.
+- **The version was two literals.** `build-plugin.sh` wrote the marketplace tree's manifest and
+  `gen-hooks-only-plugin.py` wrote the one installs actually generate. A bump to the first never
+  reached a real install, and nothing compared them. There is now a `VERSION` file, and an assertion
+  that no generator restates it.
+
+### Documentation that described the previous architecture
+
+`metadata.scope` shipped in the write path and the audit while three documents went on stating the
+model it replaced — including `INSTRUCTIONS-fragment.md`, the file every install pastes into a
+`CLAUDE.md`. Corrected, along with `/recall`'s description of the tiers and the quickstart's week-one
+habits, which are two habits and one judgement call.
+
+### Tests
+
+- **`--dry-run` had no coverage**, despite being the first command a cautious adopter runs. Nine
+  assertions now: on a fresh target it must leave the directory completely empty; against an existing
+  install every file is fingerprinted before and after and required identical.
+- The README's strongest claim — that an update does not disturb a corpus — now carries its
+  provenance. Those nineteen lifecycle assertions need the `claude` CLI, so they run on a developer
+  machine and **never in CI**. A green badge says nothing about them either way.
+
+264 assertions across seven suites, plus the lifecycle cycle outside them.
+
 ## 0.4.0
 
 ### The always-on index can now fail to be delivered, and says so
