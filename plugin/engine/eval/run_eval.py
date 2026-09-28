@@ -159,6 +159,13 @@ def health(docs):
     for key, d in docs.items():
         m = re.search(r"^name:\s*(.+)$", d["text"], re.M)
         if m: names[m.group(1).strip()] = key
+    # ARCHIVED memories are valid LINK TARGETS even though they are not SCORED. They sit outside
+    # DIRS on purpose — finished work should not be marked for retrieval quality — but a `[[slug]]`
+    # pointing at one resolves perfectly well through the catalog. Omitting them here reported every
+    # such link as dangling: moving four memories to archive/ invented five phantom findings.
+    for f in (MEM/"archive").glob("*.md"):
+        m = re.search(r"^name:\s*(.+)$", f.read_text(errors="replace"), re.M)
+        names.setdefault((m.group(1).strip() if m else f.stem), f"archive/{f.stem}")
     linked_to = set()
     for key, d in docs.items():
         for l in re.findall(r"\[\[([^\]]+)\]\]", d["text"]):

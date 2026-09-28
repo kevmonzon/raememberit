@@ -95,6 +95,15 @@ BUDGET="${RAEMEMBERIT_ALWAYS_ON_BUDGET:-12000}"
   emit_scoped "Feedback (domain-scoped — demoted from always-on)" feedback domain
   emit "Project"   project
   emit "Reference" reference
+  # ARCHIVE. Until now nothing read this directory: not the indexes, not /recall. Memories moved
+  # there became unreachable by every documented retrieval path, which makes "archive" a quiet
+  # delete rather than a filing. Listing it in the ON-DEMAND catalog keeps finished work findable
+  # and visibly finished, at no cost to the always-on tier.
+  #
+  # It stays out of the eval's corpus (DIRS = feedback/project/reference) on purpose: archived work
+  # should not be scored for retrieval quality, only remain reachable when someone looks for it.
+  emit "Archive — finished work, kept for the record" archive
+
   printf '\n## All interaction logs\n'
   printf 'Full session history lives in `interactions/` (%s files), named\n' \
     "$(count_md interactions)"
