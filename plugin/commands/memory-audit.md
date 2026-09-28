@@ -57,13 +57,30 @@ python3 engine/eval/run_eval.py --health --strict-dupes
 
 - **Hardcoded counts in prose.** Counts belong only in `rebuild-index.sh` output; they drift within
   days. Any number written into a document is a defect waiting to happen.
-- **Hook wiring versus documentation.** Read the hooks from the **live settings files**, never from
-  a document or a memory. Two consecutive audits got this wrong by reasoning from the previous
-  audit's description; one guard-file claim flipped **three times** that way, and one documented
-  hook turned out to exist in no settings file at all. This is why the hook table is generated:
+- **Hook wiring versus documentation.** Read the hooks from the **live wiring**, never from a
+  document or a memory. Two consecutive audits got this wrong by reasoning from the previous audit's
+  description; one guard-file claim flipped **three times** that way, and one documented hook turned
+  out to exist in no settings file at all. This is why the hook table is generated.
+
+  **Where the live wiring is depends on the install route, and two of the three put nothing in
+  `settings.json`.** An audit that reads only the settings files on those routes finds no hooks and
+  concludes the memory system is unwired — a confident false negative, and the same class of mistake
+  this bullet exists to prevent.
+
+  | Route | The hooks live in |
+  |---|---|
+  | `./install.sh` (standalone) | `settings.json` (and possibly `settings.local.json`) |
+  | `./install.sh --as-plugin` | `<config>/skills/raememberit/hooks/hooks.json` — settings carry none |
+  | `./install.sh --hooks-from-plugin` | same plugin file; the engine stays at `<config>/raememberit/engine/` |
+
+  Check both places rather than guessing which route was used — an empty `"hooks": {}` in
+  `settings.json` is evidence of a plugin route, not of a broken install:
 
 ```bash
-bash tools/gen-hook-table.sh
+grep -o 'hooks/[a-z-]*\.sh' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/skills/*/hooks/hooks.json 2>/dev/null | sort -u
+python3 -c "import json,sys;print(sorted(json.load(open(sys.argv[1])).get('hooks',{})))" \
+  "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+bash tools/gen-hook-table.sh     # what the repo says the wiring should be
 ```
 
 ## 5. The second silo
