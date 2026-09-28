@@ -151,9 +151,16 @@ for st in ("literal","expanded"):
         f"{st}: now {n['passed']}/{n['total']}, baseline {b['passed']}/{b['total']}"
 assert now["health"]["dup_pairs"] == 0, "starter corpus now contains near-duplicates"
 assert now["health"]["dangling"] == 0, "starter corpus now has dangling wikilinks"
+# A retrieval score describes a corpus the model may never have RECEIVED. If the shipped starter
+# tier ever grew past the budget, every fresh install would be born unable to deliver it, and the
+# scores above would keep reporting a corpus nobody ever saw.
+assert now["delivery"]["delivered"] is base["delivery"]["delivered"], \
+    f"delivery: now {now['delivery']['delivered']}, baseline {base['delivery']['delivered']}"
+assert now["delivery"]["always_on_bytes"] < 12000, \
+    f"starter always-on tier is {now['delivery']['always_on_bytes']} B, at or over the default budget"
 print(f"literal {now['runs']['literal']['passed']}/{now['runs']['literal']['total']} · "
       f"expanded {now['runs']['expanded']['passed']}/{now['runs']['expanded']['total']} · "
-      f"0 dupes · 0 dangling")
+      f"0 dupes · 0 dangling · delivered, {now['delivery']['always_on_bytes']} B always-on")
 PY
 then ok "baseline matches: $(cat "$W/cmp")"
 else bad "baseline drift" "$(cat "$W/cmp" | tail -2)"; fi

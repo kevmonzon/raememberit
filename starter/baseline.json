@@ -28,5 +28,10 @@
     "path_unverifiable_repo_absent": 0,
     "dup_pairs": 0
   },
-  "_note": "Frozen baseline for the SHIPPED starter corpus, measured on a fresh install, so that a change to a starter rule's description cannot quietly break retrieval. If a run differs, fix the corpus or the query \u2014 never edit this file to make a run green. Note what the numbers say: literal matching passes 8 of 12 and expansion passes all 12, which is the measured value of the recall command's query-expansion step."
+  "_note": "Frozen baseline for the SHIPPED starter corpus, measured on a fresh install, so that a change to a starter rule's description cannot quietly break retrieval. If a run differs, fix the corpus or the query \u2014 never edit this file to make a run green. Note what the numbers say: literal matching passes 8 of 12 and expansion passes all 12, which is the measured value of the recall command's query-expansion step.",
+  "delivery": {
+    "delivered": true,
+    "truncated_sessions": 0,
+    "_note": "A fresh install must DELIVER its index, not merely retrieve well from it. The scores above describe a corpus the model may never have received; past an undocumented size ceiling the harness swaps the payload for a file preview and reports no error."
+  }
 }

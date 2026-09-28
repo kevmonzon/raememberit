@@ -76,7 +76,38 @@ Claude Code's own auto-memory, keyed by working directory — so a memory writte
 is invisible from another, and some entries may come from other machines. Report anything
 feedback-grade that deserves promotion into this corpus. Do not hand-edit it; the harness owns it.
 
-## 6. The eval harness — the number that closes the audit
+## 6. Delivery — does the always-on index still arrive?
+
+Check this **before** any retrieval number, because a retrieval score describes a corpus the model
+may never have received. Past an undocumented size ceiling the harness does not inject a hook's
+`additionalContext`: it writes the payload to a file, hands the model a short preview and a path,
+and reports no error. Measured on a real corpus, 13 consecutive sessions received 8 of 71 index
+entries this way and every existing check stayed green.
+
+```bash
+cat "$MEM/.index-status"                  # OK <bytes> <budget>, or OVER — the last rebuild's verdict
+tail -3 "$MEM/.index-rebuild.log"         # why, if it says OVER
+grep -c '^- \[' "$MEM/MEMORY.md"          # what the always-on tier actually carries
+```
+
+| Signal | What it means |
+|---|---|
+| `.index-status` says `OVER` | the tier is past its budget and heading for the ceiling — demote before it stops arriving |
+| the SessionStart tripwire fires | it already stopped arriving, in that many sessions inside its window |
+| `feedback/` memories with no `metadata.scope:` | each one silently takes the always-on tier; count them, because this is how a trimmed tier refills |
+
+```bash
+grep -L 'scope:' "$MEM"/feedback/*.md | wc -l    # unlabelled, therefore global by default
+```
+
+An unlabelled memory is not a defect — absence deliberately means `global`, so that an older corpus
+does not go dark the first time it is rebuilt. But read this number carefully: a rule deliberately
+kept always-on and a rule nobody ever considered look **identical** here, because both are silent.
+The count only becomes a true signal once the deliberate globals carry `scope: global` explicitly;
+until then it is an upper bound, not a measurement. Labelling them is a one-line-per-file change and
+turns the ambiguity into the one number in this audit that predicts rather than reports.
+
+## 7. The eval harness — the number that closes the audit
 
 ```bash
 python3 engine/eval/run_eval.py
@@ -86,7 +117,7 @@ python3 engine/eval/run_eval.py --health
 Compare against the frozen baseline in `eval/`. **Never edit an expectation to turn a run green.**
 If a fix is applied later, re-run and report the delta — that is the only evidence it helped.
 
-## 7. Report
+## 8. Report
 
 One table: finding · evidence (count/path) · impact · proposed fix · reversible? Then **stop**.
 

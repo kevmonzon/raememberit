@@ -104,7 +104,7 @@ import json
 
 manifest = {
     "name": "raememberit",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": (
         "Memory discipline for Claude Code: a two-tier context budget, indexes generated from "
         "frontmatter, and hooks that make capture involuntary."

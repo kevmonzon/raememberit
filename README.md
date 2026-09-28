@@ -64,6 +64,15 @@ keeps writing the default corpus even when the session is pointed elsewhere.
 | `RAEMEMBERIT_ALWAYS_ON_BUDGET` | `12000` | byte ceiling for the always-on index; over it, `rebuild-index.sh` installs the index anyway and records `OVER` in `.index-status` |
 | `RAEMEMBERIT_TRIPWIRE` | `on` | `off` disables the SessionStart truncation check |
 | `RAEMEMBERIT_TRIPWIRE_WINDOW_H` | `48` | how far back the tripwire looks for truncated injections; also how long a warning takes to clear itself |
+| `RAEMEMBERIT_QUERIES` | `<corpus>/eval/queries.json` | the query file the eval harness scores against |
+| `RAEMEMBERIT_DENYLIST` | `.denylist.local.txt` | a private vocabulary file for the sanitization gate |
+
+Three more variables exist but are **configuration, not knobs**: `RAEMEMBERIT_USER`,
+`RAEMEMBERIT_PERSONA_FILE` and `RAEMEMBERIT_VOCAB_FILE`. On the standalone route they are the
+`--user`, `--persona` and `--vocabulary` flags, remembered in `raememberit/.config` so a bare re-run
+inherits them rather than silently reverting to the defaults; on the plugin route they arrive as the
+`USER`, `PERSONAFILE` and `VOCABULARYFILE` options. Setting them in `env` works, but the flag or the
+option is the intended door.
 
 A knob exists wherever an adopted setup might reasonably differ. Editing the hook scripts directly
 would not survive an upgrade — `install.sh` replaces the whole `engine/` directory — so anything worth
@@ -192,8 +201,6 @@ rule for the write helper, and the knobs, stay in the user's own settings — on
 
 **Or merged into your settings** by `install.sh`, which is the path for anyone whose commands are
 their own.
-
-## Install
 
 ## Install
 
