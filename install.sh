@@ -459,6 +459,26 @@ if [ "$DRY" = 1 ]; then printf '  would: write %s\n' "$FRAG"; else
 fi
 ok "fragment written — it is YOURS to paste into CLAUDE.md; nothing was written to your CLAUDE.md"
 
+# THE STEP THAT LOOKS LIKE SUCCESS AND ISN'T. Pasting the fragment is manual, on purpose — this
+# installer does not edit anyone's CLAUDE.md. But skip it and every hook still fires, the corpus is
+# still written, the indexes still rebuild, and nothing ever tells Claude the corpus exists. An
+# install that reports seven green steps and then does nothing is the exact failure mode this kit was
+# built to detect elsewhere; it should not ship one of its own. Looked for, not enforced: a false
+# "not referenced" is only noise, while a missed paste is a silent no-op.
+if [ "$DRY" != 1 ]; then
+  FRAG_SEEN=0
+  for c in "$TARGET/CLAUDE.md" "$PWD/CLAUDE.md"; do
+    [ -f "$c" ] && grep -qi 'raememberit' "$c" 2>/dev/null && FRAG_SEEN=1 && break
+  done
+  if [ "$FRAG_SEEN" = 0 ]; then
+    warn "no CLAUDE.md here references it yet — until one does, the hooks run but nothing"
+    warn "  tells Claude to use the corpus. Checked $TARGET/CLAUDE.md and ./CLAUDE.md;"
+    warn "  if yours lives elsewhere, this warning is the only thing that is wrong."
+  else
+    ok "a CLAUDE.md already references raememberit"
+  fi
+fi
+
 # ── hooks: merge, never replace ─────────────────────────────────────────────────────
 say "Hooks"
 # The mirror image of the case plugin mode strips: a standalone install wires seven hook groups into

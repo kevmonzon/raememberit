@@ -22,7 +22,7 @@ run()  { if [ "$DRY" = 1 ]; then printf '  would: %s\n' "$*"; else "$@"; fi; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --config-dir) TARGET="${2:?}"; shift 2 ;;
+    --config-dir) TARGET="${2:?}"; TARGET_EXPLICIT=1; shift 2 ;;
     --purge)      PURGE=1; shift ;;
     --dry-run)    DRY=1; shift ;;
     -h|--help)    sed -n '2,16p' "$0"; exit 0 ;;
@@ -39,6 +39,21 @@ if [ -z "$MEM" ] && [ -f "$TARGET/settings.json" ]; then
   MEM=$(jq -r '.env.RAEMEMBERIT_MEMORY_DIR // empty' "$TARGET/settings.json" 2>/dev/null || true)
 fi
 [ -n "$MEM" ] || MEM="$TARGET/memory"
+
+# A flag the caller typed beats a variable the environment happened to carry. install.sh has had
+# this rule since an ambient RAEMEMBERIT_MEMORY_DIR redirected a --config-dir install onto a live
+# corpus; the fix was never carried across to here, where the stakes are strictly higher. Uninstall
+# only REPORTS the corpus by default — but --purge deletes what this variable resolves to, so an
+# ambient value could offer to erase a corpus the caller never named.
+if [ "${TARGET_EXPLICIT:-0}" = 1 ] && [ -n "${RAEMEMBERIT_MEMORY_DIR:-}" ]; then
+  case "$RAEMEMBERIT_MEMORY_DIR" in
+    "$TARGET"/*) : ;;   # inside the named config dir: consistent, keep it
+    *) warn "ignoring RAEMEMBERIT_MEMORY_DIR=$RAEMEMBERIT_MEMORY_DIR"
+       warn "  --config-dir $TARGET was given explicitly, and that variable points outside it."
+       warn "  Using $TARGET/memory. An ambient variable must not redirect an explicitly targeted uninstall."
+       MEM="$TARGET/memory" ;;
+  esac
+fi
 
 say "Tooling"
 run rm -rf "$TARGET/raememberit"

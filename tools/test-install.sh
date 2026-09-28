@@ -212,6 +212,39 @@ ckt "clean config gets no predecessor warning"  "grep -q 'no memory hooks of you
 ckt "a plain re-run stays terse"                "! grep -q 'first loop' '$G2.log2'"
 rm -rf "$G" "$G2" "$G.log" "$G2.log" "$G2.log2"
 
+echo "=== an ambient corpus variable cannot redirect an explicit --config-dir ==="
+# install.sh has had this rule since an ambient RAEMEMBERIT_MEMORY_DIR redirected a --config-dir
+# install onto a live corpus. uninstall.sh did not, and that is the worse half: it only REPORTS the
+# corpus by default, but --purge deletes whatever this resolves to, so an ambient value could offer
+# to erase a corpus the caller never named. Observed 2026-09-28 reporting a real 650-file corpus as
+# the one being left alone, while the target held 15 files.
+E="${TMPDIR:-/tmp}/raememberit-ambient.$$"; rm -rf "$E"; mkdir -p "$E"
+DECOY="${TMPDIR:-/tmp}/raememberit-decoy.$$"; rm -rf "$DECOY"; mkdir -p "$DECOY"
+printf -- '---\nname: decoy\ndescription: must never be touched by a targeted install or uninstall\nmetadata:\n  type: reference\n---\n\nx\n' > "$DECOY/decoy.md"
+
+RAEMEMBERIT_MEMORY_DIR="$DECOY" "$ROOT/install.sh" --config-dir "$E" --user Casey --no-guided >"$E.ilog" 2>&1
+ckt "install ignores an ambient corpus var when --config-dir is explicit" "grep -q 'ignoring RAEMEMBERIT_MEMORY_DIR' '$E.ilog'"
+ckt "install used the target's corpus, not the ambient one" "[ -d '$E/memory/feedback' ]"
+ckt "the decoy corpus was not written to"                   "[ \"\$(find '$DECOY' -name '*.md' | wc -l | tr -d ' ')\" = 1 ]"
+
+RAEMEMBERIT_MEMORY_DIR="$DECOY" "$ROOT/uninstall.sh" --config-dir "$E" >"$E.ulog" 2>&1
+ckt "uninstall ignores it too"                        "grep -q 'ignoring RAEMEMBERIT_MEMORY_DIR' '$E.ulog'"
+ckt "uninstall reports the TARGET corpus, not the ambient one" "grep -q \"KEPT: .* at $E/memory\" '$E.ulog'"
+ckt "and the decoy is still intact"                   "[ -f '$DECOY/decoy.md' ]"
+rm -rf "$E" "$DECOY" "$E.ilog" "$E.ulog"
+
+echo "=== the fragment step is manual, so the installer says when it was skipped ==="
+# Pasting the fragment is the one step nothing enforces, and skipping it produces an install that
+# reports every step green and then does nothing — the silent success this kit exists to catch.
+F="${TMPDIR:-/tmp}/raememberit-frag.$$"; rm -rf "$F"; mkdir -p "$F"
+"$ROOT/install.sh" --config-dir "$F" --user Casey --no-guided >"$F.log1" 2>&1
+ckt "warns when no CLAUDE.md references it" "grep -q 'references it yet' '$F.log1'"
+printf '# Notes\n\nSee the raememberit fragment.\n' > "$F/CLAUDE.md"
+"$ROOT/install.sh" --config-dir "$F" --user Casey --no-guided >"$F.log2" 2>&1
+ckt "confirms when one does"                "grep -q 'already references raememberit' '$F.log2'"
+ckt "and does not then also warn"           "! grep -q 'references it yet' '$F.log2'"
+rm -rf "$F" "$F.log1" "$F.log2"
+
 echo "=== UNINSTALL leaves their setup as it was, and keeps their memories ==="
 "$ROOT/uninstall.sh" --config-dir "$T" >"$T/unlog" 2>&1
 ck  "uninstall exited 0" "$?" "0"
