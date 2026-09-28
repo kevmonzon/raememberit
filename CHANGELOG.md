@@ -6,6 +6,31 @@ behind each change lives in the commit that made it — `git log` is the long fo
 Versions before `0.4.0` predate this file; their history is in `git log` and is not reconstructed
 here, because a changelog written after the fact from subject lines is a guess wearing a date.
 
+## 0.5.2
+
+Fixes a warning `0.5.1` introduced, which fired on the setup this installer exists
+to serve.
+
+The unpasted-fragment check grepped for `raememberit` — the kit's own name — so it
+warned at every adopted install: someone who read the fragment and then wrote the
+instructions in their own words, naming `/learn` and `/recall` and their corpus
+rather than the tool. Their memory system works, and the installer told them it did
+not. Caught on the first real install after shipping it.
+
+Same defect as the rest of `0.5.x`: the check measured a proxy (is the tool named)
+rather than the property (does anything tell Claude a corpus exists). It now matches
+the corpus path, `/learn`, `/recall`, a Memory heading, or the name.
+
+Four shapes covered, because the failure has two directions: no `CLAUDE.md` warns;
+a `CLAUDE.md` about tabs and make **still** warns, so the check has not degraded
+into "is there a file"; own-words instructions are quiet; a pasted fragment is quiet.
+
+A warning that cries wolf on the recommended configuration is worse than no warning
+— it trains the reader to skip it, which is how nine false claims in the adopted
+commands survived as long as they did.
+
+275 assertions across seven suites, plus the lifecycle cycle outside them.
+
 ## 0.5.1
 
 One bug fix on a destructive path, and one guard against this kit's own
