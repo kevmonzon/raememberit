@@ -7,9 +7,15 @@ A durable memory corpus lives in this Claude Code config directory, under `memor
 directory stays one portable unit. Its path is also published as `$RAEMEMBERIT_MEMORY_DIR`. It has
 two tiers, because context injected into every prompt is the scarcest resource here:
 
-- **Always-on** — `feedback/` standing rules, injected automatically into every context.
-- **On-demand** — `project/`, `reference/` and `interactions/`, pulled in by `/recall` only when a
-  task touches their subject.
+- **Always-on** — `feedback/` standing rules that declare `metadata.scope: global`, injected once
+  per context window. An absent `scope:` counts as `global`.
+- **On-demand** — `domain`-scoped feedback, plus `project/`, `reference/`, `archive/` and
+  `interactions/`, pulled in by `/recall` only when a task touches their subject.
+
+A `feedback` memory therefore **chooses** which tier it lands in. The test: *would I want this in
+front of me before I know what the task is?* Consent and epistemic rules usually pass; craft advice
+about one repo, language or tool usually does not. Absence is the safe default, not a decision —
+a tier that only ever grows stops being delivered at all, silently, past a size ceiling.
 
 ### Writing memories: use the helper, not the Write tool
 

@@ -98,6 +98,12 @@ For a week, two habits:
 - **`/learn`** the moment you are corrected, or something non-obvious costs you real effort. Mid-task,
   not at the end of the day.
 
+And one judgement call, every time `/learn` writes a `feedback` memory: **pick a tier.**
+`scope: global` stays in front of you always; `scope: domain` goes to the catalog where `/recall`
+still finds it. Omitting the field means `global`, so the always-on tier grows by default — which is
+the one thing here that degrades quietly. `memory/.index-status` prints the verdict after every
+write.
+
 Everything else is automatic.
 
 ## If something looks broken

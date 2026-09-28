@@ -7,9 +7,10 @@ description: Use BEFORE investigating any repo, ticket, tool, error or environme
 
 Look up what is already known about a topic before spending a single tool call rediscovering it.
 
-The always-on index carries only **behavioural** memories — standing rules, plus the most recent
-sessions. Everything else — every project and reference memory, and the whole interaction-log
-history — lives on demand. This command is the bridge.
+The always-on index carries only the **globally-scoped behavioural** memories — feedback rules
+declaring `metadata.scope: global`, an absent scope counting as global, plus the most recent
+sessions. Everything else — every `domain`-scoped feedback rule, every project and reference memory,
+the archive, and the whole interaction-log history — lives on demand. This command is the bridge.
 
 Exact counts are deliberately not written down anywhere in this file; they drift within days. For
 live figures, run `engine/rebuild-index.sh`, which prints them.
