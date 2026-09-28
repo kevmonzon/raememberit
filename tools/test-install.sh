@@ -40,6 +40,24 @@ cat > "$T/settings.json" <<'J'
 }
 J
 
+# A fingerprint of every file, content only, portable across the two runners this targets.
+# `shasum` exists on both macOS and Ubuntu; `md5 -q` does not.
+fp_all() { find "$1" -type f 2>/dev/null | sort | xargs shasum 2>/dev/null | shasum | awk '{print $1}'; }
+
+echo "=== --dry-run on a fresh target: says everything, writes nothing ==="
+# This is the first command a cautious adopter runs, and it had no coverage at all. An installer
+# whose dry-run writes even one file is worse than one with no dry-run: it teaches the reader that
+# looking is safe, and is believed the next time on a directory that matters.
+D="${TMPDIR:-/tmp}/raememberit-dryrun-fresh.$$"; rm -rf "$D"; mkdir -p "$D"
+"$ROOT/install.sh" --config-dir "$D" --user Casey --no-guided --dry-run >"$D.log" 2>&1
+ck  "dry-run exited 0 on a fresh target" "$?" "0"
+ckt "it reports what it would do"        "grep -q 'would:' '$D.log'"
+ckt "no engine was installed"            "[ ! -e '$D/raememberit/engine' ]"
+ckt "no commands were written"           "[ ! -e '$D/commands' ] || [ -z \"\$(ls -A '$D/commands' 2>/dev/null)\" ]"
+ckt "no corpus was created"              "[ ! -e '$D/memory' ] || [ -z \"\$(ls -A '$D/memory' 2>/dev/null)\" ]"
+ckt "the target is still empty"          "[ -z \"\$(ls -A '$D' 2>/dev/null)\" ]"
+rm -rf "$D" "$D.log"
+
 echo "=== fresh install ==="
 "$ROOT/install.sh" --config-dir "$T" --user Casey --persona "$W_PERSONA" --vocabulary "$W_VOCAB" >"$T/log1" 2>&1
 ck "installer exited 0" "$?" "0"
@@ -136,6 +154,18 @@ ckt "their own hook still there"     "grep -q 'their-own-hook' '$T/settings.json
 ckt "their own memory untouched"     "[ -f '$MEM/feedback/their-own-rule.md' ]"
 ck  "their user_profile NOT overwritten" "$(cat "$MEM/user_profile.md")" "custom"
 ckt "re-run reported leaving the corpus alone" "grep -qi 'left completely alone' '$T/log2'"
+
+echo "=== --dry-run against an EXISTING install changes nothing ==="
+# The dangerous case. On a fresh target a dry-run has nothing to damage; against a populated config
+# it could rebuild an index, rewrite the fragment, or re-merge hooks. Fingerprint every file before
+# and after and require them identical — the same instrument test-lifecycle.sh uses on a corpus.
+BEFORE_FP="$(fp_all "$T")"; BEFORE_N="$(find "$T" -type f | wc -l | tr -d ' ')"
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided --dry-run >"$T/log-dry" 2>&1
+DRY_RC=$?
+rm -f "$T/log-dry"   # our own log would otherwise count as a change we caused
+ck  "dry-run exited 0 against an existing install" "$DRY_RC" "0"
+ck  "every file byte-identical afterwards" "$(fp_all "$T")" "$BEFORE_FP"
+ck  "no file added or removed"             "$(find "$T" -type f | wc -l | tr -d ' ')" "$BEFORE_N"
 
 echo "=== a command YOU edited is never overwritten by a re-install ==="
 # This is the one failure mode that would silently destroy work: adopting the kit into an existing
