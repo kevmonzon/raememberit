@@ -57,6 +57,22 @@ if [ "$TYPE" != log ]; then
     || { printf 'mem-write: needs a `description:` of at least 20 chars — it IS the routing signal\n' >&2; exit 1; }
   printf '%s\n' "$BODY" | grep -q "^  type: $TYPE\$" \
     || { printf 'mem-write: frontmatter needs `metadata.type: %s`\n' "$TYPE" >&2; exit 1; }
+  # ---- optional tiering: metadata.scope, feedback only ----
+  # `global`  standing rule that changes behaviour on ANY task -> always-on MEMORY.md
+  # `domain`  bound to one repo, tool or language      -> on-demand MEMORY-CATALOG.md
+  #
+  # OPTIONAL, AND ABSENT MEANS `global`, ON PURPOSE. Every one of the 62 feedback memories
+  # predating this field is unlabelled; defaulting absence to `domain` would empty the always-on
+  # tier on the next rebuild — a total blackout, strictly worse than the truncation this exists to
+  # fix. Under-injecting one rule is recoverable; silently injecting none is not. Demotion is
+  # explicit, per file, and reversible.
+  if [ "$TYPE" = feedback ]; then
+    SCOPE=$(printf '%s\n' "$BODY" | awk 'NR<=20 && /^  scope:/{sub(/^  scope:[ ]*/,""); gsub(/^"|"$/,""); print; exit}')
+    case "${SCOPE:-}" in
+      ""|global|domain) : ;;
+      *) printf 'mem-write: metadata.scope must be `global` or `domain` (got %s)\n' "$SCOPE" >&2; exit 1 ;;
+    esac
+  fi
   if [ "$TYPE" = feedback ] || [ "$TYPE" = project ]; then
     printf '%s\n' "$BODY" | grep -q '\*\*Why:\*\*' \
       || { printf 'mem-write: %s memories must carry a **Why:** line\n' "$TYPE" >&2; exit 1; }
@@ -77,7 +93,11 @@ else printf '%s\n' "$BODY" > "$FILE"; ACT=$([ "$UPDATE" = 1 ] && echo updated ||
 printf '%s %s\n' "$ACT" "${FILE#$RAEMEMBERIT_MEM/}"
 
 # ---- index, then the duplicate gate ----
-bash "$(dirname "$0")/rebuild-index.sh" | sed 's/^/  /'
+# The rebuild exits non-zero when the always-on index is over budget. That is a verdict about the
+# CORPUS, not about this write, which already succeeded — propagating it would make every future
+# `mem-write.sh` report failure on a perfectly good write until the tier is trimmed. Surface the
+# message, keep our own status. (`set -e` is active and a bare pipeline failure would abort here.)
+bash "$(dirname "$0")/rebuild-index.sh" 2>&1 | sed 's/^/  /' || true
 
 # $RAEMEMBERIT_DUPES: `block` (default) exits 3 when the corpus holds a near-duplicate pair;
 # `warn` reports and exits 0; `off` skips the check.

@@ -37,6 +37,7 @@ the file.
 | Event | Matcher | Script | Timeout |
 |---|---|---|---|
 | `SessionStart` | _(all)_ | `skillmine-nag.sh` | 5s |
+| `SessionStart` | _(all)_ | `truncation-tripwire.sh` | 5s |
 | `UserPromptSubmit` | _(all)_ | `inject-memory.sh` | 5s |
 | `PreCompact` | `auto` | `precompact-notice.sh` | 5s |
 | `PostCompact` | _(all)_ | `rearm-inject.sh` | 5s |
@@ -60,6 +61,9 @@ keeps writing the default corpus even when the session is pointed elsewhere.
 | `RAEMEMBERIT_MEMORY_DIR` | `<config>/memory` | corpus location override |
 | `RAEMEMBERIT_DUPES` | `block` | `block` refuses a write that leaves a near-duplicate · `warn` reports · `off` skips |
 | `RAEMEMBERIT_PRECOMPACT_MSG` | (built-in) | replaces the pre-compaction reminder's wording |
+| `RAEMEMBERIT_ALWAYS_ON_BUDGET` | `12000` | byte ceiling for the always-on index; over it, `rebuild-index.sh` installs the index anyway and records `OVER` in `.index-status` |
+| `RAEMEMBERIT_TRIPWIRE` | `on` | `off` disables the SessionStart truncation check |
+| `RAEMEMBERIT_TRIPWIRE_WINDOW_H` | `48` | how far back the tripwire looks for truncated injections; also how long a warning takes to clear itself |
 
 A knob exists wherever an adopted setup might reasonably differ. Editing the hook scripts directly
 would not survive an upgrade — `install.sh` replaces the whole `engine/` directory — so anything worth
@@ -69,6 +73,29 @@ keeping belongs in `settings.json` `env`, not in the script.
 the stop; that is a reasonable choice for its author and a hostile default for anyone else — a
 hook that refuses to let someone end their session is the fastest route to the kit being
 uninstalled.
+
+### Tiering the always-on index
+
+`MEMORY.md` is injected into every context window; `MEMORY-CATALOG.md` is read on demand. Only
+`feedback` memories land in the always-on tier, and each one may declare which tier it belongs to:
+
+```yaml
+metadata:
+  type: feedback
+  scope: global   # or: domain
+```
+
+`global` is a standing rule that changes behaviour on any task, whatever the repo, language or
+tool. `domain` is bound to one of those, and is demoted to the catalog where `/recall` still finds
+it. **An absent `scope` means `global`** — deliberately, because defaulting absence the other way
+would empty the always-on tier on the first rebuild after upgrading, which is a far worse failure
+than carrying one rule too many.
+
+The tier has a byte budget (`RAEMEMBERIT_ALWAYS_ON_BUDGET`) because the harness silently declines to
+inject an oversized payload: it writes the payload to a file, hands the model a short preview and a
+path, and reports no error. `rebuild-index.sh` records the verdict in `.index-status`; the
+`SessionStart` tripwire reports an injection that actually got truncated, detected from the
+artifacts the harness itself leaves rather than from any guess about where its ceiling sits.
 
 ## The sanitization gate
 
