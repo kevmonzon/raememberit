@@ -44,9 +44,33 @@ python3 engine/eval/run_eval.py --health --strict-dupes
 
 ## 3. Staleness
 
-- `project/` files whose body says SHIPPED / DONE / merged / closed. **The directory is not a
-  status signal** — 62% carried such signals in the corpus this came from. Report the count; do not
-  propose an archive sweep unless asked.
+- **`project/` status.** The directory is not a status signal — but the obvious check is worse than
+  no check. Scanning the whole body case-insensitively counts ordinary English as finished work:
+  *"assumes Phases 0–3 done"*, *"PR closed unmerged"*, *"already shipped"* about some other feature.
+  Measured on a real corpus 2026-09-28, that check reported **40 of 65** where the number worth
+  acting on was **3** — and the sweep it recommended would have buried twelve in-flight tickets,
+  one of whose PRs had shipped that morning.
+
+  Scan the `description:` line, where the convention records status, case-sensitively, and separate
+  finished from in flight:
+
+```bash
+for f in "$MEM"/project/*.md; do
+  d=$(awk '/^description:/{print; exit}' "$f")
+  printf '%s\n' "$d" | grep -qE '\b(SHIPPED|MERGED|DONE|CLOSED|COMPLETED|LANDED|ABANDONED|PARKED)\b' || continue
+  if printf '%s\n' "$d" | grep -qE 'draft PR|STACKED|PARKED'; then s=IN-FLIGHT; else s=FINISHED; fi
+  printf '%s  %s\n' "$s" "$(basename "$f" .md)"
+done | sort
+```
+
+  Even this is a **shortlist, not a verdict**: a description can carry a completion marker for one
+  sub-goal of live work, or belong to an umbrella memory that links finished children. Read the
+  FINISHED entries before proposing anything. Report the counts; do not propose an archive sweep
+  unless asked — and no count belongs in this file, per §4.
+
+  If a sweep is approved, **install before moving**. The `SessionEnd` hook runs the *installed*
+  `rebuild-index.sh`, and a copy older than the archive support does not index `archive/` — the
+  files vanish from every retrieval path on the next session end.
 - File-path claims: check existence, but treat `<placeholder>` paths as **templates, not claims**,
   and paths to repos absent from this machine as **unverifiable, not stale**. Both mistakes
   inflated the defect rate on the first audit that tried this — corrected, path validity was
