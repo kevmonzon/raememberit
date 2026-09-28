@@ -269,7 +269,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-230 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+255 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone
@@ -278,6 +278,14 @@ typed:
 - **`starter/baseline.json`** — a frozen retrieval score for the shipped starter corpus: literal
   8/12, expanded 12/12. That gap *is* the measured value of the recall command's query-expansion
   step, and a change to any starter rule's description that breaks retrieval fails the run.
+- **`tools/test-tripwire.sh`** — the delivery path: tiering, the always-on budget, and the
+  truncation tripwire. Past an undocumented size ceiling the harness does not inject a hook's
+  `additionalContext` — it writes the payload to a file and reports no error, so an index that grew
+  too large stopped being delivered while every other assertion stayed green. This suite is hostile
+  about the two ways such an alarm fails quietly: under-reporting, and crying about a fault already
+  fixed. Its own assertions are mutation-tested — narrowing the attribution match, ignoring the
+  rebuild verdict, flipping the tier default, or letting an over-budget rebuild exit clean each
+  turn it red.
 - **`tools/test-docs.sh`** — a documentation-consistency check. It verifies that the hook table in
   this README still matches the wiring it was generated from, that no protocol template has lost its
   corpus slot, that the installed git hook matches its source, that the baseline still describes a

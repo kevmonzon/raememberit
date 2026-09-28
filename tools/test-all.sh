@@ -3,7 +3,7 @@
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 rc=0
-for t in test-sanitize-scan.sh test-dedup.sh test-mem-write.sh test-install.sh test-plugin.sh test-docs.sh; do
+for t in test-sanitize-scan.sh test-dedup.sh test-mem-write.sh test-install.sh test-plugin.sh test-tripwire.sh test-docs.sh; do
   printf '\n\033[1;36m▸ %s\033[0m\n' "$t"
   if bash "$ROOT/tools/$t" | tail -1 | sed 's/^/  /'; then :; else rc=1; fi
   # tail -1 hides the detail but not the verdict; a non-zero exit from the pipeline's FIRST stage

@@ -124,7 +124,10 @@ B=$(bash "$ROOT/tools/test-dedup.sh"        | tail -1 | awk '{print $1}')
 C=$(bash "$ROOT/tools/test-mem-write.sh"    | tail -1 | awk '{print $1}')
 D=$(bash "$ROOT/tools/test-install.sh"      | tail -1 | awk '{print $1}')
 E=$(bash "$ROOT/tools/test-plugin.sh"       | tail -1 | awk '{print $1}')
-TOT=$((A+B+C+D+E))
+# Counted by hand, and that hand has been wrong: a suite added without a line here is invisible to
+# the very check that exists to stop a stale number. Add yours.
+F=$(bash "$ROOT/tools/test-tripwire.sh"     | tail -1 | awk '{print $1}')
+TOT=$((A+B+C+D+E+F))
 for f in README.md docs/ADOPTING.md; do
   claimed=$(grep -oE '[0-9]+ (automated )?assertions' "$ROOT/$f" | head -1 | awk '{print $1}')
   if [ -z "$claimed" ]; then ok "$f claims no assertion count"

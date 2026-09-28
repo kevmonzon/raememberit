@@ -88,6 +88,7 @@ name: <kebab-slug>
 description: <one line — this is what gets injected and indexed, so make it a routing signal>
 metadata:
   type: feedback | project | reference
+  scope: global | domain          # feedback only — see below; omit and it means global
 ---
 
 <the fact, stated so it is actionable a month from now>
@@ -109,8 +110,25 @@ The helper also **enforces** what the template above only shows, and refuses the
 | a missing or very short `description:` | it is the routing signal; a weak one makes the memory unfindable |
 | `name:` not matching the filename | the index keys on `name:`, so a mismatch makes the entry point nowhere |
 | a missing `metadata.type:` | it decides which tier the memory lands in |
+| a `metadata.scope:` that is not `global` or `domain` | a typo would silently take the default and seat a domain rule in every context window |
 | `feedback` or `project` with no **Why:** / **How to apply:** | a rule without its incident is unarguable later, and one without an action is unusable |
 | an existing file, unless you pass `--update` | that is step 2's verdict, enforced |
+
+**Feedback memories choose a tier.** `MEMORY.md` is injected into every context window and
+`MEMORY-CATALOG.md` is read on demand, so a `feedback` memory declares which one it belongs in:
+
+- `scope: global` — it changes behaviour on **any** task, whatever the repo, language or tool.
+- `scope: domain` — it is bound to one of those. It goes to the catalog, where `/recall` still finds it.
+
+The test that decides it: *would I want this in front of me before I know what the task is?* Consent
+and epistemic rules usually pass; craft advice about one artifact usually does not. Omitting the
+field means `global`, because defaulting the other way would empty the always-on tier the first time
+an older corpus is rebuilt — but **omitting it is not the same as choosing it**. Decide, then write.
+
+An always-on tier that only ever grows stops being delivered at all: past an undocumented size
+ceiling the harness silently swaps the whole index for a file preview, and nothing errors. That is
+what `RAEMEMBERIT_ALWAYS_ON_BUDGET` and the SessionStart tripwire exist for, and neither of them can
+make this judgement for you.
 
 A slug filename, **not** a dated one — dates are for interaction logs. Convert relative dates in the
 body to absolute; "last Tuesday" is unreadable in a month. Link related memories with `[[slug]]`,
