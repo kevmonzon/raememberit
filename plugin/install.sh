@@ -463,19 +463,27 @@ ok "fragment written — it is YOURS to paste into CLAUDE.md; nothing was writte
 # installer does not edit anyone's CLAUDE.md. But skip it and every hook still fires, the corpus is
 # still written, the indexes still rebuild, and nothing ever tells Claude the corpus exists. An
 # install that reports seven green steps and then does nothing is the exact failure mode this kit was
-# built to detect elsewhere; it should not ship one of its own. Looked for, not enforced: a false
-# "not referenced" is only noise, while a missed paste is a silent no-op.
+# built to detect elsewhere; it should not ship one of its own.
+#
+# ASK THE RIGHT QUESTION. A first version of this grepped for "raememberit" — the kit's own name —
+# and therefore fired on every adopted setup, which is the arrangement this installer is FOR: someone
+# who read the fragment and wrote the instructions in their own words, naming /learn and /recall and
+# their corpus rather than the tool. A warning that cries wolf on the recommended configuration is
+# worse than no warning, because it trains the reader to skip it. What matters is not whether the
+# fragment was pasted but whether SOMETHING tells Claude a corpus exists.
 if [ "$DRY" != 1 ]; then
   FRAG_SEEN=0
   for c in "$TARGET/CLAUDE.md" "$PWD/CLAUDE.md"; do
-    [ -f "$c" ] && grep -qi 'raememberit' "$c" 2>/dev/null && FRAG_SEEN=1 && break
+    [ -f "$c" ] || continue
+    if grep -qiE 'raememberit|/learn|/recall|^#+[[:space:]].*\bmemor' "$c" 2>/dev/null \
+       || grep -qF "$MEM" "$c" 2>/dev/null; then FRAG_SEEN=1; break; fi
   done
   if [ "$FRAG_SEEN" = 0 ]; then
-    warn "no CLAUDE.md here references it yet — until one does, the hooks run but nothing"
-    warn "  tells Claude to use the corpus. Checked $TARGET/CLAUDE.md and ./CLAUDE.md;"
+    warn "no CLAUDE.md here mentions a memory corpus — until one does, the hooks run but"
+    warn "  nothing tells Claude to use it. Checked $TARGET/CLAUDE.md and ./CLAUDE.md;"
     warn "  if yours lives elsewhere, this warning is the only thing that is wrong."
   else
-    ok "a CLAUDE.md already references raememberit"
+    ok "a CLAUDE.md already instructs Claude about a memory corpus"
   fi
 fi
 

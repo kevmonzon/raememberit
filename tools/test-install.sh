@@ -238,12 +238,27 @@ echo "=== the fragment step is manual, so the installer says when it was skipped
 # reports every step green and then does nothing — the silent success this kit exists to catch.
 F="${TMPDIR:-/tmp}/raememberit-frag.$$"; rm -rf "$F"; mkdir -p "$F"
 "$ROOT/install.sh" --config-dir "$F" --user Casey --no-guided >"$F.log1" 2>&1
-ckt "warns when no CLAUDE.md references it" "grep -q 'references it yet' '$F.log1'"
-printf '# Notes\n\nSee the raememberit fragment.\n' > "$F/CLAUDE.md"
+ckt "warns when no CLAUDE.md exists at all" "grep -q 'mentions a memory corpus' '$F.log1'"
+
+# A CLAUDE.md that exists but says nothing about memory must still warn — otherwise the check
+# degrades into "is there a file", which every repo satisfies.
+printf '# Project notes\n\nUse tabs. Run make.\n' > "$F/CLAUDE.md"
 "$ROOT/install.sh" --config-dir "$F" --user Casey --no-guided >"$F.log2" 2>&1
-ckt "confirms when one does"                "grep -q 'already references raememberit' '$F.log2'"
-ckt "and does not then also warn"           "! grep -q 'references it yet' '$F.log2'"
-rm -rf "$F" "$F.log1" "$F.log2"
+ckt "still warns when the CLAUDE.md is unrelated" "grep -q 'mentions a memory corpus' '$F.log2'"
+
+# THE FALSE POSITIVE THIS REPLACED. A first version grepped for the kit's own name and therefore
+# fired on every adopted setup — someone who read the fragment and wrote the instructions in their
+# own words, naming the commands and their corpus rather than the tool. That is the arrangement this
+# installer exists for, so warning on it trains the reader to ignore the warning.
+printf '# Notes\n\n## Memory\n\nRun /recall before investigating anything cold.\n' > "$F/CLAUDE.md"
+"$ROOT/install.sh" --config-dir "$F" --user Casey --no-guided >"$F.log3" 2>&1
+ckt "quiet when instructions exist in the user's OWN words" "grep -q 'already instructs' '$F.log3'"
+ckt "and does not also warn"                                "! grep -q 'mentions a memory corpus' '$F.log3'"
+
+printf '# Notes\n\nSee the raememberit fragment.\n' > "$F/CLAUDE.md"
+"$ROOT/install.sh" --config-dir "$F" --user Casey --no-guided >"$F.log4" 2>&1
+ckt "quiet when the fragment itself was pasted"             "grep -q 'already instructs' '$F.log4'"
+rm -rf "$F" "$F.log1" "$F.log2" "$F.log3" "$F.log4"
 
 echo "=== UNINSTALL leaves their setup as it was, and keeps their memories ==="
 "$ROOT/uninstall.sh" --config-dir "$T" >"$T/unlog" 2>&1
