@@ -184,12 +184,18 @@ renders each template exactly as the installer would — using the remembered ad
 changed merely because a flag was omitted — and diffs it against what is installed. It is strictly
 read-only, and an assertion requires the command files to be byte-identical after two runs.
 
-**Does an update disturb a corpus?** No — measured, not argued. `tools/test-lifecycle.sh` runs the real
-`install → update → uninstall` cycle against a throwaway config directory and asserts the corpus is
-byte-identical afterwards, mtimes included, and that memories survive an uninstall. It lives outside
-`test-all.sh` because a directory-marketplace install clones the **git** state, so it tests the last
-commit rather than the working tree, and it skips itself cleanly when the `claude` CLI is absent — a
-skip is "not measured here", never a pass.
+**Does an update disturb a corpus?** No — measured, not argued. `tools/test-lifecycle.sh` runs the
+real `install → update → uninstall` cycle against a throwaway config directory and asserts the corpus
+is byte-identical afterwards, mtimes included, and that memories survive an uninstall. Nineteen
+assertions. It lives outside `test-all.sh` because a directory-marketplace install clones the **git**
+state, so it tests the last commit rather than the working tree.
+
+**Read that claim with its provenance, because it is the one CI does not check.** Those nineteen
+assertions need the `claude` CLI, which a bare runner does not have. The Ubuntu job invokes the suite
+and it skips itself; the macOS job runs `test-all.sh`, which excludes it by design. So the cycle is
+measured on a developer machine, by hand, and a green CI badge says nothing about it either way — a
+skip is "not measured here", never a pass. Every other number in this section is verified on every
+push; this one is verified when someone runs it.
 
 **The one thing a plugin cannot declare** is a permission rule, and its own install path carries a
 version, so a rule aimed there would die on every update. A `SessionStart` hook places a *wrapper* at
