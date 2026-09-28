@@ -99,12 +99,17 @@ with open("plugin/hooks/hooks.json", "w") as f:
 PY
 
 # --- 3. the manifest, with every knob declared as a typed option -------------------------------
-python3 - <<'PY'
-import json
+python3 - "$ROOT/VERSION" <<'PY'
+import json, pathlib, sys
+
+# ONE SOURCE. This was two: build-plugin.sh wrote the marketplace tree's manifest and
+# tools/gen-hooks-only-plugin.py wrote the installed one, each with its own literal. Bumping the
+# first left every real install on the old number, silently, because nothing compared them.
+VERSION = pathlib.Path(sys.argv[1]).read_text().strip()
 
 manifest = {
     "name": "raememberit",
-    "version": "0.4.0",
+    "version": VERSION,
     "description": (
         "Memory discipline for Claude Code: a two-tier context budget, indexes generated from "
         "frontmatter, and hooks that make capture involuntary."

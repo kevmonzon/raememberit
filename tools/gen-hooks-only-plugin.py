@@ -13,7 +13,7 @@ Kept as a file rather than inlined in install.sh for one plain reason: it is a P
 shell script that is itself often edited through heredocs, and nested same-delimiter heredocs silently
 truncate. That cost a mangled script once already.
 """
-import json
+import json, pathlib
 import os
 import sys
 
@@ -31,9 +31,13 @@ def main() -> int:
         print("  refusing to generate a plugin with no hooks in it", file=sys.stderr)
         return 1
 
+    # ONE SOURCE — see VERSION at the repo root. This file previously carried its own literal, and
+    # since it is the generator the INSTALLER uses, a bump elsewhere never reached a real install.
+    version = (pathlib.Path(__file__).resolve().parent.parent / "VERSION").read_text().strip()
+
     manifest = {
         "name": "raememberit",
-        "version": "0.3.0",
+        "version": version,
         "description": (
             "raememberit's hooks only. The engine lives in the config directory at raememberit/engine, "
             "which is where these commands resolve to, so anything else referencing that path keeps "

@@ -138,6 +138,30 @@ N=$(ls "$ROOT/starter/feedback"/*.md 2>/dev/null | wc -l | tr -d ' ')
 [ "$N" -ge 8 ] && [ "$N" -le 12 ] && ok "starter set is $N rules, inside the stated 8-12 range" \
   || bad "starter set is $N rules, outside the stated 8-12 range"
 
+echo "=== one version, and nothing restates it ==="
+# The version WAS two literals: build-plugin.sh wrote the marketplace tree's manifest and
+# gen-hooks-only-plugin.py wrote the one the installer produces. A bump to the first never reached a
+# real install, and nothing compared them.
+#
+# Both now read VERSION, so asserting "generator agrees with VERSION" would be TAUTOLOGICAL — worse,
+# test-plugin.sh runs build-plugin.sh in place, so by the time this runs the tree has already been
+# resynced to whatever VERSION says. Assert the two things that can actually still be false:
+#   1. a SECOND literal has been reintroduced somewhere
+#   2. the COMMITTED manifest is behind VERSION, i.e. someone bumped without rebuilding
+V=$(cat "$ROOT/VERSION" 2>/dev/null | tr -d ' \n')
+[ -n "$V" ] && ok "VERSION is $V" || bad "no VERSION file at the repo root"
+
+lits=$(grep -rnE '"version"[[:space:]]*:[[:space:]]*"[0-9]+\.[0-9]+\.[0-9]+"' \
+        "$ROOT/tools" "$ROOT/install.sh" 2>/dev/null | grep -v 'test-plugin.sh' || true)
+[ -z "$lits" ] && ok "no generator restates the version as a literal" \
+                || bad "a second version literal has reappeared" "$lits"
+
+CV=$(git -C "$ROOT" show HEAD:plugin/.claude-plugin/plugin.json 2>/dev/null \
+     | python3 -c "import json,sys;print(json.load(sys.stdin).get('version',''))" 2>/dev/null)
+if [ -z "$CV" ]; then ok "no committed plugin manifest to compare (fresh clone)"
+elif [ "$CV" = "$V" ]; then ok "committed plugin manifest is current ($CV)"
+else bad "committed plugin manifest is $CV but VERSION is $V — bumped without rebuilding"; fi
+
 echo "=== the frozen baseline still describes a fresh install ==="
 T="$W/inst"
 bash "$ROOT/install.sh" --config-dir "$T" >/dev/null 2>&1
