@@ -87,7 +87,7 @@
           {
             "type": "command",
             "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/rebuild-index-hook.sh",
-            "timeout": 30
+            "timeout": 5
           }
         ]
       }

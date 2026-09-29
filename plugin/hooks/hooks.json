@@ -92,7 +92,7 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/engine/hooks/rebuild-index-hook.sh",
-            "timeout": 30
+            "timeout": 5
           }
         ]
       }

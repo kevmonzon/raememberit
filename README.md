@@ -44,7 +44,7 @@ the file.
 | `Stop` | _(all)_ | `require-log.sh` | 5s |
 | `SessionEnd` | `clear` | `close-log.sh` | 5s |
 | `SessionEnd` | `clear` | `rearm-inject.sh` | 5s |
-| `SessionEnd` | _(all)_ | `rebuild-index-hook.sh` | 30s |
+| `SessionEnd` | _(all)_ | `rebuild-index-hook.sh` | 5s |
 
 Every command resolves through `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`, so the same wiring
 works in a default install and in an isolated sandbox with no rewriting. `CLAUDE_CONFIG_DIR`

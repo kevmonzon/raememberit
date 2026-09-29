@@ -6,6 +6,21 @@ behind each change lives in the commit that made it — `git log` is the long fo
 Versions before `0.4.0` predate this file; their history is in `git log` and is not reconstructed
 here, because a changelog written after the fact from subject lines is a guess wearing a date.
 
+## Unreleased
+
+### The `SessionEnd` index rebuild was cancelled on every exit
+
+`rebuild-index-hook.sh` ran the rebuild in the foreground. On exit the harness gives
+`SessionEnd` hooks a short budget of its own, and the `timeout` in the wiring does not
+extend it. A real corpus took ~1.7s to rebuild, so every exit printed
+`SessionEnd hook [...rebuild-index-hook.sh] failed: Hook cancelled`, and the index never
+refreshed at exit. Nothing was corrupted: the rebuild stages to temps and `mv`s them in,
+so a killed run leaves the previous index intact. It was simply stale.
+
+The rebuild is now detached (`set -m`, `nohup`, every fd released). The hook returns in
+milliseconds and the rebuild finishes after the session is gone. The wired timeout drops
+from 30s to 5s, in line with the other hooks, because the hook no longer does the work.
+
 ## 0.5.2
 
 Fixes a warning `0.5.1` introduced, which fired on the setup this installer exists
