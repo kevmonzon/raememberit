@@ -394,15 +394,41 @@ if [ -n "$HAVE" ]; then
 else
   FRESH=1; ok "no existing corpus — scaffolding a fresh one"
 fi
+# A DELETED STARTER RULE STAYS DELETED. Topping up used to copy in every shipped starter that was
+# absent, which cannot tell "never seeded" from "deleted on purpose" — and a starter someone removed
+# came back on the next --force, uninvited, into the always-on tier. So the corpus keeps a record of
+# which starters were ever seeded into it (.seeded-starters, one name per line). A name in the record
+# is a decision already taken, present or not; only a starter NOT in the record — one that shipped
+# after this corpus was seeded — is added.
+#
+# A corpus with NO record predates this. Its missing starters are undecidable, so none are added:
+# every shipped name is recorded as decided, and the installer says how to add one by hand. Adding
+# silently was the defect; asking someone to copy one file is not.
+SEEDREC="$MEM/.seeded-starters"
 if [ "$FRESH" = 1 ] || [ "$FORCE" = 1 ]; then
   for d in feedback project reference interactions archive artifacts eval; do run mkdir -p "$MEM/$d"; done
   [ -f "$MEM/README.md" ]   || run cp "$SRC/scaffold/memory/README.md" "$MEM/README.md"
-  if [ "$DRY" = 1 ]; then printf '  would: install user_profile.md and starter rules\n'; else
+  if [ "$DRY" = 1 ]; then printf '  would: install user_profile.md and starter rules (respecting %s)\n' "$SEEDREC"; else
     [ -f "$MEM/user_profile.md" ] || sed "s/{{USER}}/$PUSER/g" "$SRC/starter/user_profile.md" > "$MEM/user_profile.md"
-    for f in "$SRC/starter/feedback"/*.md; do
-      [ -e "$f" ] || continue
-      [ -f "$MEM/feedback/$(basename "$f")" ] || cp "$f" "$MEM/feedback/"
-    done
+    seeded=0; skipped_deleted=0
+    if [ "$FRESH" = 0 ] && [ ! -f "$SEEDREC" ]; then
+      warn "no seed record at $SEEDREC — this corpus predates it, so a missing starter rule cannot be"
+      warn "  told apart from one you deleted. None added. Want one? cp $SRC/starter/feedback/<name>.md $MEM/feedback/"
+      for f in "$SRC/starter/feedback"/*.md; do [ -e "$f" ] && basename "$f" .md; done > "$SEEDREC"
+    else
+      touch "$SEEDREC"
+      for f in "$SRC/starter/feedback"/*.md; do
+        [ -e "$f" ] || continue
+        nm=$(basename "$f" .md)
+        if grep -qx "$nm" "$SEEDREC"; then
+          [ -f "$MEM/feedback/$nm.md" ] || skipped_deleted=$((skipped_deleted+1))
+          continue
+        fi
+        [ -f "$MEM/feedback/$nm.md" ] || { cp "$f" "$MEM/feedback/"; seeded=$((seeded+1)); }
+        printf '%s\n' "$nm" >> "$SEEDREC"
+      done
+    fi
+    [ "$skipped_deleted" -gt 0 ] && ok "$skipped_deleted starter rule(s) you deleted stay deleted"
     [ -f "$MEM/eval/queries.json" ] || cp "$SRC/starter/queries.json" "$MEM/eval/queries.json"
   fi
   ok "scaffold, starter rules and eval queries in place (existing files never replaced)"

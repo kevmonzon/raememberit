@@ -8,6 +8,14 @@ here, because a changelog written after the fact from subject lines is a guess w
 
 ## Unreleased
 
+### A deleted starter rule came back on the next `--force`
+
+Topping up a scaffold copied in every shipped starter that was absent, which cannot tell "never
+seeded" from "deleted on purpose". The corpus now records which starters it received
+(`memory/.seeded-starters`); a name in the record is a decision already taken, and only a starter
+that shipped later is added. A corpus with no record — one seeded by an earlier version — gets
+nothing added, a record written, and a line naming the `cp` for anyone who wants one.
+
 ### The plugin route could not be upgraded by re-running the installer
 
 `--as-plugin` refused to touch an existing `skills/raememberit/` without `--force` — right for

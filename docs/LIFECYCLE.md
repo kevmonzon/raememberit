@@ -331,7 +331,9 @@ inspect first.
 |---|---|---|---|
 | `${TMPDIR}/raememberit-injected-<sid>` | `inject-memory.sh` | `rearm-inject.sh` | one injection per context window |
 | `<corpus>/.last-sweep` | `/skill-mine` | never (advanced) | the sweep delta and the session-start nag |
-| `raememberit/.installed-commands` | `install.sh` | `uninstall.sh` | the four-state upgrade policy |
+| `raememberit/.installed-commands` | `install.sh` | `uninstall.sh` | the four-state upgrade policy for commands |
+| `skills/raememberit/.raememberit-placed` | `install.sh --as-plugin` | replacing the directory | the same policy for the plugin directory: untouched is updated, edited is skipped |
+| `<corpus>/.seeded-starters` | `install.sh` | never | which starter rules this corpus ever received, so a `--force` top-up never re-adds one you deleted |
 | `raememberit/shipped/<name>` | `install.sh` on a skip | you | recovering a shipped command you chose not to take |
 | `$CLAUDE_PLUGIN_DATA/bin/mem-write.sh` | `place-shim.sh` | plugin removal | a version-free path for the permission rule |
 | `<corpus>/.index-status` | `rebuild-index.sh` | next rebuild | the always-on budget verdict, `OK`/`OVER`, surfaced by the tripwire |

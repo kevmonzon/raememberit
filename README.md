@@ -228,7 +228,10 @@ round trip, explains what each hook does to your session, and tells you how to u
 need to. `--no-guided` skips it; a re-run is terse by default.
 
 Idempotent: re-run it to upgrade. It **merges** hooks into an existing settings file rather than
-replacing it, never overwrites an existing corpus, and never touches credentials.
+replacing it, never overwrites an existing corpus, and never touches credentials. A `--force` top-up
+adds only starter rules that shipped *after* the corpus was seeded — the corpus records which ones it
+received in `memory/.seeded-starters`, so a rule you deleted stays deleted. A corpus from before that
+record gets nothing added and a line saying how to copy one in by hand.
 
 ### Adopting this into a setup you have already customized
 
@@ -290,7 +293,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-286 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+296 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

@@ -81,6 +81,32 @@ ck  "exactly the 11 starter rules" "$N" "11"
 ckt "optional rules are NOT installed" "[ ! -f '$MEM/feedback/plan-substantial-work-to-files.md' ]"
 ckt "always-on index lists them"       "grep -q 'verify-effect-not-just-wiring' '$MEM/MEMORY.md'"
 
+echo "=== the corpus records which starters were seeded, so a deletion is respected ==="
+# Topping up used to re-add every absent starter, which cannot distinguish "never seeded" from
+# "deleted on purpose" — a rule someone removed came back on the next --force, into the always-on
+# tier. Measured 2026-09-30 with a deliberately deleted starter.
+ckt "seed record written on a fresh install" "[ -s '$MEM/.seeded-starters' ]"
+ck  "it lists every shipped starter" "$(wc -l < "$MEM/.seeded-starters" | tr -d ' ')" "11"
+rm "$MEM/feedback/shell-dialect-traps.md"
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided --force >"$T/log-topup" 2>&1
+ckt "--force does NOT re-add a starter you deleted"  "[ ! -f '$MEM/feedback/shell-dialect-traps.md' ]"
+ckt "and says so"                                    "grep -q 'stay deleted' '$T/log-topup'"
+# A starter that shipped AFTER this corpus was seeded is not in the record, and must be added.
+grep -v '^verify-effect-not-just-wiring$' "$MEM/.seeded-starters" > "$MEM/.sr" && mv "$MEM/.sr" "$MEM/.seeded-starters"
+rm "$MEM/feedback/verify-effect-not-just-wiring.md"
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided --force >"$T/log-topup2" 2>&1
+ckt "a starter absent from the record IS added on top-up" "[ -f '$MEM/feedback/verify-effect-not-just-wiring.md' ]"
+ckt "and recorded"                                        "grep -qx 'verify-effect-not-just-wiring' '$MEM/.seeded-starters'"
+ckt "the deleted one is still gone"                       "[ ! -f '$MEM/feedback/shell-dialect-traps.md' ]"
+# A corpus from before the record: undecidable, so nothing is added and the record is written.
+rm "$MEM/.seeded-starters"
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided --force >"$T/log-topup3" 2>&1
+ckt "with no record, a missing starter is NOT added"  "[ ! -f '$MEM/feedback/shell-dialect-traps.md' ]"
+ckt "the installer explains why and how to add one"  "grep -q 'no seed record' '$T/log-topup3' && grep -q 'cp .*starter/feedback' '$T/log-topup3'"
+ck  "and the record now covers every shipped starter" "$(wc -l < "$MEM/.seeded-starters" | tr -d ' ')" "11"
+# Restore the fixture so the later starter-count assertions see the shipped set.
+cp "$ROOT/starter/feedback/shell-dialect-traps.md" "$MEM/feedback/"
+
 echo "=== installed commands point at the REAL corpus (doc/code drift guard) ==="
 # This assertion exists because the corpus moved once and the command templates did not follow. A
 # live session then reported a confident "no prior memory" after grepping a directory that does not
