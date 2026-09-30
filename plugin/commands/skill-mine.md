@@ -55,7 +55,17 @@ Every interaction log newer than the watermark, plus all of `feedback/`, `projec
 
 - **Recurrence** — the same sequence of actions in 2+ logs.
 - **Effort** — a log describing 3+ non-obvious steps to reach a result.
-- **Friction** — feedback entries describing a workflow the user had to correct more than once.
+- **Friction** — feedback entries describing a workflow the user had to correct more than once,
+  **and the corrections log**, which records every prompt the correction detector matched:
+
+  ```bash
+  awk -F'\t' -v l="$LAST" '$1 > l {print $4}' "$MEM/.corrections-log" 2>/dev/null | sort | uniq -c | sort -rn | head -20
+  ```
+
+  A correction that appears twice in the delta — or twice across sessions, in different words about
+  the same thing — is the highest-ranked candidate there is: the user had to say it twice, and nothing
+  wrote it down. Check it against `feedback/` first; if a rule already covers it, the finding is that
+  the rule is not being applied, which is a skill improvement, not a new memory.
 - **Annotation** — "always do this", "every time", "next time", "the pattern is", "remember to".
 
 ### 3. Synthesize candidates

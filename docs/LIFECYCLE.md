@@ -132,6 +132,10 @@ command's or skill's `description:`, and surfaces the best few — in `shadow` m
 logging them to `.recall-log` and `.skill-log` only, in `inject` mode by adding them to the prompt's
 context under a byte budget. Once per hit per session, guarded like the injection is.
 
+`correction-nudge.sh` fires on the same event. A prompt matching one of a few strong correction
+shapes is logged to `.corrections-log` and, in `nudge` mode, answered with one line of context naming
+`/learn` — at most once per ten minutes per session.
+
 What gets injected is only the **always-on tier**:
 
 | Tier | File | Contents |
@@ -224,6 +228,7 @@ directory.
 
 ```
 Stop ────────────▶ require-log.sh        warn (default) | strict | off
+                 ▶ learn-nag.sh          two corrections this session and no feedback write since the first
 SessionEnd(clear)▶ close-log.sh          stamps a /clear boundary into today's latest log
                  ▶ rearm-inject.sh       next context re-injects
 SessionEnd(all) ─▶ rebuild-index-hook.sh regenerates both indexes from frontmatter (30s)
@@ -349,6 +354,8 @@ inspect first.
 | `raememberit/shipped/<name>` | `install.sh` on a skip | you | recovering a shipped command you chose not to take |
 | `$CLAUDE_PLUGIN_DATA/bin/mem-write.sh` | `place-shim.sh` | plugin removal | a version-free path for the permission rule |
 | `${TMPDIR}/raememberit-surfaced-<sid>` | `context-router.py` | session end (temp dir) | one surfacing per memory or skill per session |
+| `<corpus>/.corrections-log` | `correction-nudge.sh` | never (append-only) | every prompt that read like a correction — the learn nag's count and `/skill-mine`'s friction signal |
+| `${TMPDIR}/raememberit-nudged-<sid>`, `-learnnag-<sid>` | the two correction hooks | session end (temp dir) | one nudge per ten minutes; one nag per session |
 | `<corpus>/.recall-log` | `/recall`, `context-router.py` | never (append-only) | which memories are ever retrieved — the audit's archive shortlist and the router's precision sample |
 | `<corpus>/.skill-log` | `context-router.py` | never (append-only) | which skills the router matched, for the same precision sample |
 | `<corpus>/.skill-index` | `context-router.py` | rebuilt when a command or skill is newer | name, kind, path, description of every installed command and skill |

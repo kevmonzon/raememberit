@@ -8,6 +8,16 @@ here, because a changelog written after the fact from subject lines is a guess w
 
 ## Unreleased
 
+### `/learn`'s trigger is a process now
+
+`correction-nudge.sh` (`UserPromptSubmit`) matches a few strong correction shapes — a leading
+*"No,"*, *"I told you"*, *"you should have"* — logs the hit to `memory/.corrections-log` and, in
+`nudge` mode, adds one line of context naming `/learn`, at most once per ten minutes. `learn-nag.sh`
+(`Stop`) notices a session with two or more corrections and no `feedback/` memory newer than the
+first, and says so once; `strict` blocks the stop. `/skill-mine` now reads the corrections log for
+friction, ranking a correction that recurs with nothing written down above everything else, and
+`/memory-audit` reports the same gap. Knob: `RAEMEMBERIT_CORRECTIONS`.
+
 ### Retrieval no longer depends on remembering to retrieve
 
 A new `UserPromptSubmit` hook, `context-router.sh`, scores every prompt — its tokens, the working

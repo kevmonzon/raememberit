@@ -40,9 +40,11 @@ the file.
 | `SessionStart` | _(all)_ | `truncation-tripwire.sh` | 5s |
 | `UserPromptSubmit` | _(all)_ | `inject-memory.sh` | 5s |
 | `UserPromptSubmit` | _(all)_ | `context-router.sh` | 5s |
+| `UserPromptSubmit` | _(all)_ | `correction-nudge.sh` | 5s |
 | `PreCompact` | `auto` | `precompact-notice.sh` | 5s |
 | `PostCompact` | _(all)_ | `rearm-inject.sh` | 5s |
 | `Stop` | _(all)_ | `require-log.sh` | 5s |
+| `Stop` | _(all)_ | `learn-nag.sh` | 5s |
 | `SessionEnd` | `clear` | `close-log.sh` | 5s |
 | `SessionEnd` | `clear` | `rearm-inject.sh` | 5s |
 | `SessionEnd` | _(all)_ | `rebuild-index-hook.sh` | 5s |
@@ -71,6 +73,7 @@ keeps writing the default corpus even when the session is pointed elsewhere.
 | `RAEMEMBERIT_SKILLROUTER` | `shadow` | its skill half: `shadow` logs matching commands and skills to `memory/.skill-log` · `inject` names them in context · `off` |
 | `RAEMEMBERIT_AUTORECALL_BUDGET` | `1500` | byte ceiling for the injected memory block |
 | `RAEMEMBERIT_ROUTER_MAX` | `3` | entries per injected block |
+| `RAEMEMBERIT_CORRECTIONS` | `nudge` | the correction detector: `nudge` logs a prompt that reads like a correction to `memory/.corrections-log` and adds one line naming `/learn`; at Stop, two corrections with no feedback write since the first get one reminder · `strict` makes that reminder block the stop · `shadow` logs only · `off` |
 
 Three more variables exist but are **configuration, not knobs**: `RAEMEMBERIT_USER`,
 `RAEMEMBERIT_PERSONA_FILE` and `RAEMEMBERIT_VOCAB_FILE`. On the standalone route they are the
@@ -106,6 +109,17 @@ growing by another door. Run it in shadow for a week, have `/memory-audit` sampl
 to `inject` with the number in hand. `/recall` writes the same log for manual sweeps, so together they
 are the only record of which memories are ever read — the audit uses it to shortlist memories nobody
 has retrieved in months, which is how the corpus prunes itself instead of only growing.
+
+### The correction detector — `/learn`'s trigger as a process
+
+`/learn` is meant to fire the moment you are corrected. That trigger lived in prose, and the moment it
+most needs to fire is the moment the model is busy being wrong. `correction-nudge.sh` matches a small
+set of strong correction shapes against every prompt — a leading *"No,"*, *"I told you"*, *"you should
+have"*, not *"always"* or *"never"*, which are everywhere — logs the hit to `memory/.corrections-log`,
+and in `nudge` mode adds one line of context naming `/learn`, at most once per ten minutes. At Stop,
+`learn-nag.sh` notices a session with two or more corrections and no `feedback/` memory newer than the
+first, and says so once; `strict` makes it block. The log is what `/skill-mine` reads for friction — a
+correction that recurs across sessions with nothing written down outranks everything else it finds.
 
 ### Tiering the always-on index
 
@@ -350,7 +364,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-378 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+396 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

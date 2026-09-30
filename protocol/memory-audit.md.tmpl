@@ -168,6 +168,11 @@ Read the shortlist against the log's **age**: a memory unretrieved in a three-da
 nothing; one unretrieved across ninety days of real use is a candidate for `archive/`. Report the
 window with the count.
 
+**Corrections that never became memories.** `$MEM/.corrections-log` holds every prompt the
+correction detector matched (ISO, epoch, session, snippet). Group the snippets; any that recur across
+sessions with no `feedback/` memory newer than the first are the corpus's most expensive gap —
+{{USER}} is paying for the same correction repeatedly. Hand them to `/skill-mine`, which ranks by this.
+
 **Router precision, while the router is in shadow mode.** Sample twenty `auto-shadow` lines and judge
 each hit: would the memory or skill have helped that prompt? Report hits, misses and the ratio. That
 ratio is the evidence for flipping `RAEMEMBERIT_AUTORECALL` or `RAEMEMBERIT_SKILLROUTER` to `inject`,

@@ -128,6 +128,58 @@ route ctx8 "deploying the billing service to staging again" "/x" >/dev/null
 grep -q 'pumpkin-carving' "$MEM/.skill-index" && ok "a new command is picked up by the next prompt" || bad "skill index went stale"
 rm -f "${TMPDIR:-/tmp}"/raememberit-surfaced-ctx*
 
+echo "=== the correction detector: a process, not a paragraph ==="
+NUDGE="$ROOT/engine/hooks/correction-nudge.sh"; NAG="$ROOT/engine/hooks/learn-nag.sh"
+rm -f "$MEM/.corrections-log" "${TMPDIR:-/tmp}"/raememberit-nudged-cor* "${TMPDIR:-/tmp}"/raememberit-learnnag-cor*
+nudge() {  # sid prompt [env...]
+  local sid="$1" prompt="$2"; shift 2
+  printf '{"session_id":"%s","prompt":%s}' "$sid" "$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$prompt")" \
+    | env RAEMEMBERIT_MEMORY_DIR="$MEM" "$@" bash "$NUDGE" 2>/dev/null
+}
+out=$(nudge cor1 "No, I told you to use the helper, not the Write tool")
+printf '%s' "$out" | grep -q 'reads like a correction' && ok "a leading 'No,' plus 'I told you' is nudged" || bad "correction not nudged" "$out"
+printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null && ok "the nudge is valid hook JSON" || bad "nudge is not valid JSON"
+grep -q "	cor1	No, I told you" "$MEM/.corrections-log" && ok "the correction is logged with its session and snippet" || bad "correction not logged" "$(cat "$MEM/.corrections-log" 2>/dev/null)"
+awk -F'\t' 'NF!=4{exit 1}' "$MEM/.corrections-log" && ok "log rows are ISO, epoch, session, snippet" || bad "log row shape is wrong"
+out=$(nudge cor1 "Actually, the staging deploy needs the VPN")
+[ -z "$out" ] && ok "a second correction within ten minutes is logged but not nudged again" || bad "nudged twice inside the window" "$out"
+[ "$(awk -F'\t' '$3=="cor1"' "$MEM/.corrections-log" | wc -l | tr -d ' ')" = 2 ] && ok "both corrections are in the log" || bad "second correction not logged"
+out=$(nudge cor2 "Please add a test for the new endpoint and run the linter")
+[ -z "$out" ] && ! grep -q "	cor2	" "$MEM/.corrections-log" && ok "an ordinary request is neither nudged nor logged" || bad "false positive on an ordinary request" "$out"
+out=$(nudge cor3 "It is always fine to never worry about this")
+[ -z "$out" ] && ok "'always' and 'never' in ordinary prose do not fire" || bad "fired on always/never" "$out"
+out=$(nudge cor4 "/learn something")
+[ -z "$out" ] && ok "a slash command is left alone" || bad "fired on a slash command"
+out=$(nudge cor5 "Wrong, that is not the file I meant" RAEMEMBERIT_CORRECTIONS=shadow)
+[ -z "$out" ] && grep -q "	cor5	" "$MEM/.corrections-log" && ok "shadow mode logs and says nothing" || bad "shadow mode misbehaved" "$out"
+out=$(nudge cor6 "Wrong, that is not the file I meant" RAEMEMBERIT_CORRECTIONS=off)
+[ -z "$out" ] && ! grep -q "	cor6	" "$MEM/.corrections-log" && ok "off mode neither nudges nor logs" || bad "off mode did something"
+
+echo "=== the learn nag: corrections piled up and nothing was learned ==="
+nag() { printf '{"session_id":"%s"}' "$1" | env RAEMEMBERIT_MEMORY_DIR="$MEM" "${@:2}" bash "$NAG" 2>/dev/null; }
+out=$(nag cor2)
+[ -z "$out" ] && ok "silent for a session with no corrections" || bad "nagged with no corrections"
+out=$(nag cor5)
+[ -z "$out" ] && ok "silent after a single correction — one is a conversation" || bad "nagged after one correction"
+out=$(nag cor1)
+printf '%s' "$out" | grep -q '2 corrections this session and no feedback memory' && ok "two corrections and no feedback write: one systemMessage" || bad "no nag after two corrections" "$out"
+out=$(nag cor1)
+[ -z "$out" ] && ok "the nag fires once per session" || bad "nagged twice"
+# A feedback memory written AFTER the first correction silences it, for a fresh session with the same shape.
+nudge cor7 "No, use the other one" >/dev/null; nudge cor7 "Again? I said the other one" >/dev/null
+sleep 1; mem feedback learned-it "The rule that came out of being corrected twice in one session, written down" "scope: domain"
+out=$(nag cor7)
+[ -z "$out" ] && ok "a feedback memory written after the first correction counts as learned" || bad "nagged despite a feedback write" "$out"
+# Strict blocks the stop.
+nudge cor8 "No, not that" >/dev/null; nudge cor8 "I told you already" >/dev/null
+# make the feedback dir look older than the corrections: the fixture written above is newer, so backdate it
+touch -t 202001010000 "$MEM"/feedback/*.md
+out=$(nag cor8 RAEMEMBERIT_CORRECTIONS=strict 2>&1); rc=$?
+[ "$rc" = 2 ] && ok "strict mode blocks the stop (exit 2)" || bad "strict mode did not block (rc=$rc)"
+out=$(nag cor8 RAEMEMBERIT_CORRECTIONS=off); rc=$?
+[ "$rc" = 0 ] && [ -z "$out" ] && ok "off mode is silent at Stop too" || bad "off mode nagged"
+rm -f "${TMPDIR:-/tmp}"/raememberit-nudged-cor* "${TMPDIR:-/tmp}"/raememberit-learnnag-cor*
+
 echo "─────"
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1
