@@ -16,7 +16,7 @@ To compute hit@1 at all, this harness imputes the ranking the command's prose im
   3. newer mtime beats older ("prefer the newest hits")
 Any candidate design that defines its own ranking should replace `search()` only.
 """
-import argparse, json, os, pathlib, re, sys, time
+import argparse, json, os, pathlib, re, shutil, sys, time
 from difflib import SequenceMatcher
 
 # Root resolution mirrors engine/lib/raememberit-root.sh: CLAUDE_CONFIG_DIR relocates the whole
@@ -41,8 +41,10 @@ def load_docs():
             m = re.search(r"^description:\s*(.+)$", t, re.M)
             key = f"{d}/{f.name}"
             desc = (m.group(1) if m else "").strip().strip('"')
+            nm = re.search(r"^name:\s*(.+)$", t, re.M)
             docs[key] = {
                 "path": f, "text": t,
+                "name": (nm.group(1).strip() if nm else f.stem),
                 # Faithful to /recall step 2: the catalog line is `- [name](path) — description`,
                 # so name and path are searchable, not just body prose.
                 "lower": (key + "\n" + f.stem.replace("-", " ") + "\n" + t).lower(),
@@ -105,7 +107,42 @@ def search(docs, terms):
     hits.sort(key=lambda h: (not h[1], -h[2], -h[3]))
     return [h[0] for h in hits]
 
+def resolve_expect(want, docs):
+    """Map one `expect` entry to a corpus key, or None when nothing on disk answers to it.
+
+    An entry may be a key (`project/x.md`) or a bare `name:` (the example file uses those). An
+    entry naming a file that no longer exists used to score as a retrieval MISS — the same line
+    the harness prints when retrieval genuinely fails — so a renamed memory read as a ranking
+    defect for eight days while the memory sat at rank 1. Missing is a different fact from
+    unranked, and it gets its own word.
+    """
+    if want in docs:
+        return want
+    by_name = {d["name"]: k for k, d in docs.items()}
+    if want in by_name:
+        return by_name[want]
+    stem = pathlib.PurePath(want).stem
+    return by_name.get(stem)
+
+def rename_hint(want, docs):
+    """The most likely current key for an expectation that resolves to nothing.
+
+    Renames in this corpus keep the topic and drop or add a prefix (a date, a ticket key), so a
+    key whose stem ends the expected stem, or the reverse, is the candidate worth naming. A hint,
+    not a resolution: the expectation is still reported missing, because silently following a
+    guess would turn the guard back into decoration.
+    """
+    stem = pathlib.PurePath(want).stem.lower()
+    cands = [k for k, d in docs.items()
+             if k != want and (stem.endswith(d["path"].stem.lower()) or d["path"].stem.lower().endswith(stem))]
+    return min(cands, key=len) if cands else None
+
 def evaluate(q, docs, native, strategy):
+    # The shipped example file spells a query `{"q": ..., "expect": [...]}` and nothing else; the
+    # full form adds id, category, variants and mode. Accept the short form, with `any` as the
+    # mode, so the example runs rather than raising KeyError on its first entry.
+    q = {**q, "query": q.get("query", q.get("q"))}
+    q.setdefault("id", q["query"]); q.setdefault("category", "-"); q.setdefault("mode", "any")
     terms = [q["query"]] if strategy == "literal" else q.get("variants", [q["query"]])
     mode  = q["mode"]
     r = {"id": q["id"], "category": q["category"], "mode": mode, "strategy": strategy}
@@ -127,12 +164,24 @@ def evaluate(q, docs, native, strategy):
                  detail="clean" if not results else f"FALSE POSITIVES: {results[:3]}")
         return r
 
-    want = q["expect"]
+    resolved = {w: resolve_expect(w, docs) for w in q["expect"]}
+    missing  = [w for w, k in resolved.items() if k is None]
+    want     = [k for k in resolved.values() if k]
+    if missing:
+        r["expect_missing"] = missing
+        notes = []
+        for w in missing:
+            h = rename_hint(w, docs)
+            notes.append(f"{w}" + (f" (renamed? now {h})" if h else ""))
+        r["missing_note"] = "EXPECT-MISSING: " + "; ".join(notes)
+    if not want:
+        r.update(passed=False, detail=r["missing_note"])
+        return r
     if mode == "exactly_one":
         present = [w for w in want if w in results]
         r.update(passed=len(present) == 1,
                  detail=f"{len(present)} of {len(want)} near-identical memories retrievable (want exactly 1)")
-        return r
+        return _noted(r)
 
     ranks = {w: (results.index(w) + 1 if w in results else None) for w in want}
     got   = [w for w, k in ranks.items() if k]
@@ -141,17 +190,40 @@ def evaluate(q, docs, native, strategy):
         inwin = [w for w, rk in ranks.items() if rk and rk <= k]
         r.update(passed=len(inwin) == len(want),
                  detail=f"{len(inwin)}/{len(want)} within top-{k}; ranks={sorted(v for v in ranks.values() if v)}")
-        return r
+        return _noted(r)
 
     best = min((v for v in ranks.values() if v), default=None)
     r.update(hit1=best == 1, hit3=bool(best and best <= 3), passed=bool(best and best <= 3),
              detail=f"best rank {best}" if best else f"MISS (0/{len(want)} retrieved)")
     if q.get("path_claim"):
         p = pathlib.Path(os.path.expanduser(q["path_claim"]))
-        r["path_claim_exists"] = p.exists()
-        r["detail"] += f"; claimed path {'EXISTS' if p.exists() else 'GONE'}: {q['path_claim']}"
+        tool = q.get("requires_tool")
+        if tool and shutil.which(tool) is None:
+            # The path belongs to a tool this machine does not have. Absent is the expected
+            # state, not evidence the memory rotted: the health section already draws the same
+            # line for repos that are not checked out here. Unverifiable is the honest word.
+            r["path_claim_exists"] = None
+            r["detail"] += f"; claimed path UNVERIFIABLE ({tool} not installed): {q['path_claim']}"
+        else:
+            r["path_claim_exists"] = p.exists()
+            r["detail"] += f"; claimed path {'EXISTS' if p.exists() else 'GONE'}: {q['path_claim']}"
     if q.get("scope_warning") and got:
         r["detail"] += f"; SCOPE-LIMITED ({q['scope_warning']}) — must be labelled when reported"
+    return _noted(r)
+
+def _noted(r):
+    """A missing expectation is reported on every mode's line, not only the rank-based one.
+
+    `exactly_one` and `all` count the expectations that resolved; one that did not resolve would
+    otherwise drop out of the denominator and the line would read as a smaller, cleaner test.
+    """
+    if r.get("missing_note"):
+        if r["missing_note"] not in r["detail"]:
+            r["detail"] += "; " + r["missing_note"]
+        # The members that DID resolve may all rank — the test still failed, because the file
+        # it was written to guard is not there. Caught by the suite on first run: `all` went
+        # green with one member missing, since the missing one had left the denominator.
+        r["passed"] = False
     return r
 
 def health(docs):

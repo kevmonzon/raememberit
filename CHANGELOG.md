@@ -6,6 +6,28 @@ behind each change lives in the commit that made it — `git log` is the long fo
 Versions before `0.4.0` predate this file; their history is in `git log` and is not reconstructed
 here, because a changelog written after the fact from subject lines is a guess wearing a date.
 
+## 0.6.3
+
+### The eval harness said MISS when it meant "that file is not here any more"
+
+An `expect` entry naming a memory that had since been renamed or merged scored as
+`MISS (0/1 retrieved)` — the same line retrieval prints when it genuinely fails. On a real corpus
+that hid three stale expectations behind what looked like ranking defects, one of them for eight
+days while the memory sat at rank 1; a fourth passed, because the missing member had simply left
+the denominator. The harness now reports `EXPECT-MISSING: <path>` on its own, names the likely
+current file when a rename left the topic intact (`renamed? now project/...`), and never lets a
+test with a missing member go green. An expectation may also be a bare `name:` now, as the
+example file always wrote them.
+
+A `path_claim` for a tool this machine does not have read as `GONE`, the word for rot. With
+`"requires_tool": "<binary>"` on the query it reads `UNVERIFIABLE (<binary> not installed)`
+instead; without the tool named, or with it present, an absent path is still `GONE`.
+
+The shipped `queries.example.json` raised `KeyError: 'query'` on its first entry — it uses the
+short `{"q": ..., "expect": [...]}` form the harness never accepted. It runs now.
+
+**`tools/test-eval.sh`** pins all of it: twelve assertions on a fixture corpus, in `test-all.sh`.
+
 ## 0.6.2
 
 ### An update followed the recommended route instead of the one you installed on

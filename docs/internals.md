@@ -255,6 +255,14 @@ Four features that operate on the corpus rather than inside a session.
 | `/skill-mine` | offered past 15 new logs | only logs newer than `.last-sweep` | ranked skill candidates, promoted at the **2nd** recurrence | yes, on per-candidate approval |
 | `engine/eval/run_eval.py` | on demand + in CI | corpus + `eval/queries.json` | hit@1 per strategy, plus `--health` | no |
 
+A red line from the harness names which of three things failed, because they call for different
+fixes: `MISS` / `best rank N` is retrieval; `EXPECT-MISSING: <path>` is an expectation naming a
+file that is no longer there (with `renamed? now <path>` when a rename kept the topic) — fix the
+query, after checking the memory really did move; `claimed path GONE` is a `path_claim` that has
+rotted, unless the query names a `requires_tool` that this machine lacks, in which case the line
+reads `UNVERIFIABLE` and says nothing about the memory. An `expect` entry may be a corpus path or
+a bare `name:`.
+
 If `/learn` has been doing its job, `/memory-reflect` is boring — most durable facts are
 already written, and what remains is the narrative, which exists nowhere else.
 
