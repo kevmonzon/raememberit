@@ -1,8 +1,8 @@
-# Lifecycle
+# Internals — the lifecycle, stage by stage
 
 How every feature in this kit comes alive, in what order, and what it leaves behind.
 
-`README.md` says *what* each part is. This says *when* each part runs, what state it reads,
+[How it works](how-it-works.md) says *what* each part is, with pictures. This says *when* each part runs, what state it reads,
 what state it writes, and which other feature depends on that state existing. Read it when
 adding a feature (where does it hook in?), when one misfires (which stage owns it?), or when
 deciding whether something can be removed (who reads its output?).
@@ -375,9 +375,9 @@ inspect first.
    `${CLAUDE_PLUGIN_ROOT}` for code). `CLAUDE_CONFIG_DIR` relocates the config but does **not**
    change `$HOME`, so a hardcoded `~/.claude` keeps writing the default corpus even when the
    session is pointed elsewhere.
-5. **One mechanism, one description.** `hooks.json` and the README's hook table are generated
+5. **One mechanism, one description.** `hooks.json` and the hook table in `docs/commands.md` are generated
    from `settings.fragment.json`, and `tools/test-docs.sh` fails when they drift — including
-   the assertion count in the README.
+   the assertion count in `docs/development.md`.
 6. **A knob, not an edit.** `install.sh` replaces the whole engine directory; anything
    customized in a script is kept aside at `engine.prev` and named, not carried forward, and
    anything in `settings.json` `env` survives untouched.
