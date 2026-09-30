@@ -113,6 +113,17 @@ engine_changed() {  # prints the changed files, or "unknown" when there is no re
   (cd "$eng" && find . -type f | sort | xargs shasum 2>/dev/null) | diff "$man" - | grep '^[<>]' | awk '{print $3}' | sed 's|.*/||' | sort -u
 }
 engine_current() { [ -z "$(diff -rq "$SRC/engine" "$(installed_engine)" 2>/dev/null | grep -v settings.fragment.json)" ]; }
+# WHICH WAY IT WAS INSTALLED. The front door used to run the recommended route for every update,
+# whatever route the person had installed on. On an --as-plugin install that left the old engine
+# inside the plugin and put a second one in the config dir: status reported an update available
+# for ever. Measured 2026-10-01 across three old versions. So: detect, and update the same way.
+detect_route() {
+  if [ "$PLUGIN" = 1 ]; then printf 'plugin'
+  elif [ -d "$TARGET/skills/raememberit/engine" ]; then printf 'as-plugin'
+  elif [ -f "$TARGET/skills/raememberit/hooks/hooks.json" ]; then printf 'hooks-from-plugin'
+  elif grep -q '/raememberit/engine/hooks/' "$TARGET/settings.json" 2>/dev/null; then printf 'standalone'
+  else printf 'hooks-from-plugin'; fi
+}
 own_memory_hooks() {  # events on which the person already has memory hooks of their own
   local f
   for f in "$TARGET/settings.json" "$TARGET/settings.local.json"; do
@@ -233,18 +244,39 @@ do_update_body() {
        line "     I will keep your version next to the new one so nothing is lost" ;;
   esac
   [ -n "$(own_memory_hooks)" ] && note "your own memory reminders in settings are left alone, as before"
+  local route extra="" prevdir="$TARGET/raememberit-previous-tools"; route="$(detect_route)"
+  case "$route" in
+    standalone)
+      note "your background reminders currently live in your Claude Code preferences; after this they"
+      note "  come from a small folder of their own instead — the recommended arrangement" ;;
+    as-plugin)
+      if [ ! -f "$TARGET/skills/raememberit/.raememberit-placed" ]; then
+        extra="--replace-plugin"
+        note "your tools folder predates the record that tells edited from untouched, so I will keep a"
+        note "  copy of it at $(tilde "$prevdir") and replace it"
+      fi ;;
+  esac
   [ -z "$NAME" ] && NAME="$(cfgget user)"
   ask_yn "Update now?" y || { line "Nothing was changed."; exit 0; }
 
   local log="${TMPDIR:-/tmp}/raememberit-update.$$.log"
-  if [ "$PLUGIN" = 1 ]; then
-    run_quiet "$log" bash "$SRC/install.sh" --plugin --config-dir "$TARGET" --no-guided ${NAME:+--user "$NAME"} || exit 1
-  else
-    run_quiet "$log" bash "$SRC/install.sh" --hooks-from-plugin --config-dir "$TARGET" --no-guided ${NAME:+--user "$NAME"} || exit 1
-  fi
+  case "$route" in
+    plugin)    run_quiet "$log" bash "$SRC/install.sh" --plugin --config-dir "$TARGET" --no-guided ${NAME:+--user "$NAME"} || exit 1 ;;
+    as-plugin)
+      if [ -n "$extra" ]; then rm -rf "$prevdir"; cp -R "$TARGET/skills/raememberit" "$prevdir"; else rm -rf "$prevdir"; fi
+      run_quiet "$log" bash "$SRC/install.sh" --as-plugin $extra --config-dir "$TARGET" --no-guided ${NAME:+--user "$NAME"} || exit 1
+      if grep -q 'YOU edited this since it was placed' "$log"; then
+        printf '\n'; flag "you changed the tools folder yourself since it was placed, so I left it alone"
+        line "    to take the new version anyway:  ./raememberit update --advanced --as-plugin --replace-plugin"
+        rm -f "$log"; printf '\n'; exit 0
+      fi ;;
+    *)         run_quiet "$log" bash "$SRC/install.sh" --hooks-from-plugin --config-dir "$TARGET" --no-guided ${NAME:+--user "$NAME"} || exit 1 ;;
+  esac
   printf '\n'
   good "tools updated to $NEW_VERSION"
   [ -d "$TARGET/raememberit/engine.prev" ] && line "    your old version is kept at $(tilde "$TARGET/raememberit/engine.prev")"
+  [ -n "$extra" ] && line "    your previous tools folder is kept at $(tilde "$prevdir")"
+  [ "$route" = standalone ] && good "background reminders moved out of your preferences into their own folder"
   local after; after=$(reminders_count)
   if [ "$after" -gt "$reminders_before" ]; then good "background reminders refreshed ($((after-reminders_before)) new, all quiet by default)"
   else good "background reminders refreshed"; fi

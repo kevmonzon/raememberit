@@ -531,6 +531,12 @@ if [ "$FRESH" = 1 ] || [ "$FORCE" = 1 ]; then
     [ -f "$MEM/eval/queries.json" ] || cp "$SRC/starter/queries.json" "$MEM/eval/queries.json"
   fi
   ok "scaffold, starter rules and eval queries in place (existing files never replaced)"
+elif [ ! -f "$SEEDREC" ] && [ "$DRY" != 1 ]; then
+  # An existing corpus on a plain re-run: nothing is seeded, but the record must exist from now on,
+  # or the NEXT --force still cannot tell a deleted starter from one never seeded. Every shipped name
+  # is recorded as decided — the same verdict the --force path reaches for a record-less corpus.
+  for f in "$SRC/starter/feedback"/*.md; do [ -e "$f" ] && basename "$f" .md; done > "$SEEDREC"
+  ok "seed record written — starter rules you have deleted will stay deleted on any future top-up"
 fi
 [ -n "$VOCAB" ] && run cp "$VOCAB" "$TARGET/raememberit/vocabulary.txt"
 

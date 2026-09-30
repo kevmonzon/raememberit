@@ -8,7 +8,7 @@ How the project checks itself, and how to change it without breaking the checks.
 tools/test-all.sh
 ```
 
-465 assertions across nine suites, plus the plugin lifecycle cycle outside them. CI runs the same
+482 assertions across nine suites, plus the plugin lifecycle cycle and the upgrade matrix outside them. CI runs the same
 command on Ubuntu and on macOS's bash 3.2, and the sanitization gate is the pre-commit hook.
 
 | Suite | Asserts |
@@ -21,6 +21,7 @@ command on Ubuntu and on macOS's bash 3.2, and the sanitization gate is the pre-
 | `test-tripwire.sh` | the delivery path: tiering, the always-on budget, the truncation tripwire — mutation-tested |
 | `test-context.sh` | domain tags, the native silo listing, the router in every mode, the correction detector and the learn nag |
 | `test-wizard.sh` | the front door: every verb, no jargon on the happy path, defaults with nobody present, the `CLAUDE.md` note round trip, from inside the plugin |
+| `test-upgrade-matrix.sh` | three released versions from git history × three routes, each used like a person and then updated by this tree — runs in CI with full history; skips itself on a shallow clone |
 | `test-docs.sh` | the docs describe the thing that exists: hook table generated from the wiring, assertion count measured, every internal link resolves, the frozen baseline still describes a fresh install |
 
 Two checks compare the project against itself rather than against a number someone typed:

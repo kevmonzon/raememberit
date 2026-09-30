@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # the upgrade matrix installs older versions from git history
 
       - name: Write the private denylist if one was provided
         if: ${{ secrets.RAEMEMBERIT_DENYLIST != '' }}
@@ -34,6 +36,11 @@ jobs:
       # so treat a skip as "not measured here", never as a pass.
       - name: Plugin lifecycle (skips without the claude CLI)
         run: tools/test-lifecycle.sh
+
+      # Three released versions, extracted from history, times three install routes, each used like
+      # a person would and then updated with this tree. Needs full history, hence fetch-depth: 0.
+      - name: Upgrade matrix
+        run: tools/test-upgrade-matrix.sh
 
   # The scripts target bash 3.2, because that is what macOS ships. Ubuntu runs bash 5, so a 3.2-only
   # break (mapfile, associative arrays) would pass CI and fail on the machines this is for. A macOS

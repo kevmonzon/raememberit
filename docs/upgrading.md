@@ -27,6 +27,11 @@ when there is not.
 | `CLAUDE.md` | untouched if it already speaks of memories; the four-line note is offered if not |
 | starter rules you deleted | stay deleted — the corpus records which ones it received |
 | the corpus schema | recorded in `raememberit/.config`; a corpus newer than the installer is refused, not guessed at |
+| the install route | kept: an `--as-plugin` install stays one, a `--hooks-from-plugin` install stays one. A standalone install (hooks in `settings.json`) is moved to the recommended arrangement, and the preview says so before asking |
+
+Every released version since 0.4.0, on every route, is updated by this tree's front door in CI:
+sixteen assertions per cell, including that the person's memories, edited command, deleted
+starter, own hook and non-ASCII setting all survive, and that a second update is a no-op.
 
 An update that finds the always-on tier over budget says so and completes anyway; the verdict is a
 fact about your corpus, not a failure of the update.

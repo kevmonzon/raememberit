@@ -82,6 +82,12 @@ ckt "optional rules are NOT installed" "[ ! -f '$MEM/feedback/plan-substantial-w
 ckt "always-on index lists them"       "grep -q 'verify-effect-not-just-wiring' '$MEM/MEMORY.md'"
 
 echo "=== the corpus records which starters were seeded, so a deletion is respected ==="
+# A corpus from before the record, updated WITHOUT --force, must still gain the record — or the next
+# --force is as blind as ever. Measured 2026-10-01: three old versions updated, none had a record.
+rm -f "$MEM/.seeded-starters"
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-plainrerun" 2>&1
+ckt "a plain re-run writes the seed record for a record-less corpus" "[ -s '$MEM/.seeded-starters' ]"
+ckt "and says so"                                                     "grep -q 'seed record written' '$T/log-plainrerun'"
 # Topping up used to re-add every absent starter, which cannot distinguish "never seeded" from
 # "deleted on purpose" — a rule someone removed came back on the next --force, into the always-on
 # tier. Measured 2026-09-30 with a deliberately deleted starter.

@@ -121,6 +121,45 @@ printf 'delete my memories\n' | bash "$WIZ" uninstall --yes --and-my-memories --
 bash "$WIZ" uninstall --yes --config-dir "$T" >"$W/o10" 2>&1
 grep -q 'nothing to remove' "$W/o10" && ok "uninstalling twice is harmless" || bad "second uninstall misbehaved" "$(cat "$W/o10")"
 
+echo "=== update keeps the route the person installed on ==="
+# The front door ran the recommended route for EVERY update. On an --as-plugin install that left the
+# old engine inside the plugin and added a second one to the config dir; status then reported an
+# update available for ever. Measured 2026-10-01 across three old versions and all three routes.
+TA="$W/asp/.claude"; mkdir -p "$TA"
+bash "$ROOT/install.sh" --as-plugin --config-dir "$TA" --no-guided --user Pat >/dev/null 2>&1
+printf '\n# older\n' >> "$TA/skills/raememberit/engine/hooks/close-log.sh"; (cd "$TA/skills/raememberit" && find . -type f ! -name '.raememberit-placed' ! -name '.DS_Store' | sort | xargs shasum | shasum | awk '{print $1}') > "$TA/skills/raememberit/.raememberit-placed"
+bash "$WIZ" update --yes --config-dir "$TA" >"$W/a1" 2>&1; rc=$?
+[ "$rc" = 0 ] && ok "as-plugin: update finishes" || bad "as-plugin update rc=$rc" "$(tail -5 "$W/a1")"
+! grep -q '# older' "$TA/skills/raememberit/engine/hooks/close-log.sh" && ok "as-plugin: the plugin's own engine was updated" || bad "as-plugin: plugin engine still old"
+[ ! -d "$TA/raememberit/engine" ] && ok "as-plugin: no second engine appeared in the config dir" || bad "as-plugin: a config-dir engine was added — hybrid"
+grep -q 'CLAUDE_PLUGIN_ROOT' "$TA/skills/raememberit/hooks/hooks.json" && ok "as-plugin: hooks still point inside the plugin" || bad "as-plugin: hooks were regenerated to the config dir"
+bash "$WIZ" status --config-dir "$TA" >"$W/a2" 2>&1; rc=$?
+[ "$rc" = 0 ] && grep -q 'up to date' "$W/a2" && ok "as-plugin: status is clean after the update" || bad "as-plugin: status not clean" "$(strip < "$W/a2" | grep '!')"
+# A plugin directory from before the placement record: kept aside, replaced, and said so.
+rm -f "$TA/skills/raememberit/.raememberit-placed"; printf '\n# older2\n' >> "$TA/skills/raememberit/engine/hooks/close-log.sh"
+bash "$WIZ" update --yes --config-dir "$TA" >"$W/a3" 2>&1; rc=$?
+[ "$rc" = 0 ] && ! grep -q '# older2' "$TA/skills/raememberit/engine/hooks/close-log.sh" && ok "as-plugin: a pre-record plugin directory is replaced by update" || bad "as-plugin: pre-record directory not replaced (rc=$rc)" "$(strip < "$W/a3" | tail -4)"
+grep -q '# older2' "$TA/raememberit-previous-tools/engine/hooks/close-log.sh" 2>/dev/null && ok "as-plugin: and the previous folder is kept beside it" || bad "as-plugin: previous folder not kept"
+grep -q 'keep a' "$W/a3" && ok "as-plugin: the preview said it would" || bad "as-plugin: preview silent about the copy"
+no_jargon "as-plugin update" "$W/a3"
+# An edited plugin directory (record present, contents changed) is left alone and the way out named.
+printf '\n# mine\n' >> "$TA/skills/raememberit/engine/hooks/close-log.sh"
+bash "$WIZ" update --yes --config-dir "$TA" >"$W/a4" 2>&1
+grep -q '# mine' "$TA/skills/raememberit/engine/hooks/close-log.sh" && grep -q 'left it alone' "$W/a4" && ok "as-plugin: an edited plugin directory is left alone and the override is named" || bad "as-plugin: edited directory handling wrong" "$(strip < "$W/a4" | tail -4)"
+rm -rf "$W/asp"
+# Standalone: the update migrates to the recommended route and SAYS so beforehand.
+TS="$W/sa/.claude"; mkdir -p "$TS"
+bash "$ROOT/install.sh" --config-dir "$TS" --no-guided --user Pat >/dev/null 2>&1
+printf '\n# older\n' >> "$TS/raememberit/engine/hooks/close-log.sh"
+bash "$WIZ" update --yes --config-dir "$TS" >"$W/s1" 2>&1; rc=$?
+[ "$rc" = 0 ] && ok "standalone: update finishes" || bad "standalone update rc=$rc"
+grep -q 'currently live in your Claude Code preferences' "$W/s1" && ok "standalone: the preview names the move out of settings" || bad "standalone: migration not announced"
+grep -q 'moved out of your preferences' "$W/s1" && ok "standalone: and the summary confirms it" || bad "standalone: migration not confirmed"
+python3 -c 'import json,sys; d=json.load(open("'"$TS"'/settings.json")); c=[h["command"] for a in d.get("hooks",{}).values() for g in a for h in g["hooks"]]; sys.exit(1 if any("raememberit" in x for x in c) else 0)' \
+  && [ -f "$TS/skills/raememberit/hooks/hooks.json" ] && ok "standalone: reminders now come from the plugin only" || bad "standalone: hooks doubled or missing"
+no_jargon "standalone update" "$W/s1"
+rm -rf "$W/sa"
+
 echo "=== from inside the plugin tree, the same front door, plugin mechanics ==="
 # /raememberit:setup runs plugin/raememberit. The engine is the plugin's own, the corpus is seeded
 # outside it, and no hooks are wired into settings (the plugin supplies them).

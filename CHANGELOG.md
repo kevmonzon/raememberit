@@ -6,6 +6,25 @@ behind each change lives in the commit that made it — `git log` is the long fo
 Versions before `0.4.0` predate this file; their history is in `git log` and is not reconstructed
 here, because a changelog written after the fact from subject lines is a guess wearing a date.
 
+## 0.6.2
+
+### An update followed the recommended route instead of the one you installed on
+
+`./raememberit update` ran `--hooks-from-plugin` for every install. On an `--as-plugin` install
+that left the old engine inside the plugin and added a second one to the config dir; `status`
+then reported an update available for ever. Found by installing 0.4.0, 0.5.2 and 0.6.0 from git
+history on all three routes, using each like a person would, and updating — nine cells, seven
+failing. The front door now detects the route and updates the same way. A standalone install is
+still moved to the recommended arrangement, and the preview says so first. A plugin directory
+from before the placement record is kept at `raememberit-previous-tools` and replaced; one you
+edited since is left alone with the override named.
+
+A plain re-run on an existing corpus now writes the seed record too, so the next `--force` can
+tell a deleted starter from one never seeded.
+
+**`tools/test-upgrade-matrix.sh`** is that experiment, kept: three released versions times three
+routes, sixteen assertions each, run in CI with full history.
+
 ## 0.6.1
 
 Three things the first live update of 0.6.0 measured, fixed the same evening, plus the

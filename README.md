@@ -90,7 +90,7 @@ each part: **[How it works →](docs/how-it-works.md)**
 ## Status
 
 Alpha. Extracted from one engineer's daily setup and generalized; installable with one command,
-465 assertions green on every push, and the update path measured rather than promised. The
+482 assertions green on every push, and every release since 0.4.0 updated to this one in CI on every route. The
 prompt-time router ships in shadow mode until its precision has been measured on your corpus.
 
 ## Contributing
