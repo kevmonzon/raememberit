@@ -38,28 +38,26 @@ claude          # then run /login
 
 ```bash
 cd /path/to/raememberit
-./install.sh --user "<your name or handle>"
+./raememberit install
 ```
 
-It prints every step. Two lines worth reading:
+It tells you what it found, asks what Claude should call you, shows what it is about to do, and
+does it after you say yes. Three lines of its summary are worth reading:
 
-- **`corpus at …`** — where your memories go: inside the config directory, so the whole thing stays
-  portable.
-- **`N permission rule(s) added so the write helper runs without prompting`** — memories are written
-  by `engine/mem-write.sh` over Bash, because Claude Code refuses its edit tools on paths inside a
-  `.claude` directory. `ADOPTING.md` explains it.
-- **`N raememberit hook group(s) wired`** — what it added to the settings file. It merges; it never
-  replaces.
+- **`memory folder created`** — where your memories go: inside the config directory, so the whole
+  thing stays portable.
+- **`Claude can save memories without asking`** — memories are written by a small helper over Bash,
+  because Claude Code refuses its edit tools on paths inside a `.claude` directory. `ADOPTING.md`
+  explains it.
+- **`added — Claude will now use memories on its own`** — the note it put in your `CLAUDE.md`, after
+  showing it to you. Without that note the commands only work when you type them.
 
-Want to see it without doing it: `./install.sh --dry-run`.
+Want to see it without doing it: `./raememberit install --advanced --dry-run`.
 
-## 4. Point Claude at the memory instructions
+## 4. Nothing — that step is done
 
-The installer writes a fragment and does **not** edit any `CLAUDE.md` for you. Add it:
-
-```bash
-cat $CLAUDE_CONFIG_DIR/raememberit/INSTRUCTIONS-fragment.md >> ~/raememberit-trial/workspace/CLAUDE.md
-```
+Older versions asked you to paste a fragment into a `CLAUDE.md` by hand here. The installer now
+offers to do it, shows the four lines first, and creates the file if you do not have one.
 
 ## 5. Your first ten minutes
 
@@ -109,7 +107,7 @@ Everything else is automatic.
 ## If something looks broken
 
 ```bash
-./install.sh --check                                                      # is the install current? read-only
+./raememberit status                                                      # is it installed, current, healthy? read-only
 bash $CLAUDE_CONFIG_DIR/raememberit/engine/rebuild-index.sh               # regenerate the indexes
 python3 $CLAUDE_CONFIG_DIR/raememberit/engine/eval/run_eval.py --health   # structural check
 claude --bare                                                             # hooks OFF: tells kit from harness
@@ -128,7 +126,7 @@ Code's.
 ## Getting out
 
 ```bash
-./uninstall.sh          # tooling gone, memories kept
+./raememberit uninstall          # tooling gone, memories kept
 ```
 
 Or simply `unset CLAUDE_CONFIG_DIR` and open a new terminal — your normal setup was never modified.

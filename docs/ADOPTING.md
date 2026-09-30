@@ -11,28 +11,30 @@ generalized so it can be someone else's.
 
 ## What the installer does for you
 
-You do not need to read `QUICKSTART.md` first. A fresh install runs **guided**: it tells you what it
-found, warns you if you already have memory hooks that would double up, shows each change before
-making it, walks you through the first loop, and tells you how to get out. The quickstart is there if
-you prefer reading, but it is not a prerequisite.
+```bash
+./raememberit install
+```
+
+You do not need to read anything first. It tells you what it found, asks what Claude should call
+you, shows each change before making it — including the short note it offers to put in your
+`CLAUDE.md` — and ends with a two-minute round trip to try. `./raememberit status` afterwards says
+whether anything is wrong, in plain words.
 
 Fifteen minutes to install and try. Then use Claude Code as you normally would, with two habits added:
-`/learn` when you get corrected, `/recall` before digging into something cold.
+`/learn` when you get corrected, `/recall` before digging into something cold. The background
+reminders do the rest, and the prompt-time router quietly logs what it *would* have surfaced until
+you choose to let it.
 
 ## Adopting into a setup you have already customized
 
 This is a real path, not an afterthought — it is the case the author's own setup proved matters.
 
-`install.sh --hooks-from-plugin` is the recommended route, for a customized setup and a fresh one
-alike: it brings the engine and the commands, leaves any command you have edited alone, and supplies
-the hooks through a small generated plugin so nothing lands in `settings.json`. If you already have
-memory hooks of your own, guided mode **detects and names them** rather than quietly running both,
-because two mechanisms doing the same job is the failure mode you will not notice until your index is
-written twice.
-
-`--as-plugin` is the other route, for someone with nothing to preserve who wants everything inside one
-plugin directory. Its commands are managed files, so it cannot carry commands you have edited. Either
-way, `./install.sh --check` tells you whether an install is current and prints the exact re-run.
+The same `./raememberit install` handles it. It leaves any command you have edited alone and says so,
+detects memory hooks you already have and names them rather than quietly running both, and if your
+`CLAUDE.md` already speaks of memories in your own words it does not touch it. On later updates it
+names anything you changed in the tools and keeps your version next to the new one. Everything it
+decides for you — the route, the flags — is documented in `ADVANCED.md` if you want to decide it
+yourself.
 
 ## Known rough edges
 
@@ -43,9 +45,8 @@ Stated up front so none of them is a surprise:
   stays one portable unit, and Claude Code refuses its edit tools on paths inside a `.claude`
   directory as sensitive — no permission rule changes that. Bash is not gated, so
   `engine/mem-write.sh` is the write path. It also validates the schema, which the edit tool could not.
-- **Updates are manual** — `git pull && ./install.sh --check`, then the re-run it prints. Re-running is
-  safe and never touches memories; anything you patched in the engine is named and kept aside rather
-  than lost.
+- **Updates are manual** — `git pull && ./raememberit update`. It shows what will change first, never
+  touches memories, and keeps a copy of anything you changed in the tools rather than losing it.
 - **The always-on index grows.** Every `feedback/` rule is injected into every context forever. In the
   setup this came from it grew about 10% a week, and once by 10% in a single afternoon. Watch it, and
   retire rules — adding is the easy half.
@@ -57,8 +58,8 @@ Stated up front so none of them is a surprise:
 ## How to stop
 
 ```bash
-./uninstall.sh          # removes the tooling, KEEPS your memories
-./uninstall.sh --purge  # also deletes them, after asking you to type DELETE
+./raememberit uninstall                     # removes the tooling, KEEPS your memories
+./raememberit uninstall --and-my-memories   # also deletes them, after you type "delete my memories"
 ```
 
 It removes only its own hooks, commands and permission rules. Your settings, your own hooks and your
