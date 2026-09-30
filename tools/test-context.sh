@@ -122,6 +122,14 @@ out=$(route ctx7 "the billing node upgrade is failing when deploying to staging,
 printf '%s' "$out" | grep -q 'billing-node-upgrade' && bad "a 60-byte budget still admitted a 100-byte line" || ok "the byte budget is respected"
 out=$(printf 'not json at all' | env RAEMEMBERIT_MEMORY_DIR="$MEM" CLAUDE_CONFIG_DIR="$CFG" bash "$ROUTER" 2>&1); rc=$?
 [ "$rc" = 0 ] && [ -z "$out" ] && ok "malformed stdin exits 0 silently — a hook must never break a prompt" || bad "malformed stdin: rc=$rc out=$out"
+# A dangling symlink in skills/ — a skill moved or uninstalled while its link stayed — crashed the
+# router on every prompt on the first real machine it ran on. glob() returns it; stat() raises.
+mkdir -p "$CFG/skills/gone-skill"; ln -s /nowhere/at/all/SKILL.md "$CFG/skills/gone-skill/SKILL.md"
+out=$(route ctx9 "deploying the billing service to staging once more" "/x" RAEMEMBERIT_SKILLROUTER=inject 2>"$W/err9"); rc=$?
+[ "$rc" = 0 ] && ok "a dangling skill symlink does not break the router (exit $rc)" || bad "dangling symlink crashed the router: rc=$rc" "$(tail -3 "$W/err9")"
+printf '%s' "$out" | grep -q 'deploy-checklist' && ok "and the other skills are still routed" || bad "skills not routed with a dangling symlink present" "$out"
+! grep -q 'gone-skill' "$MEM/.skill-index" && ok "the dangling entry is left out of the index" || bad "dangling symlink indexed"
+rm -rf "$CFG/skills/gone-skill"
 # The skill index is rebuilt when a command appears after it was built.
 sleep 1; printf -- '---\nname: pumpkin-carving\ndescription: Use when the billing service deploy to staging needs a pumpkin for luck\n---\nbody\n' > "$CFG/commands/pumpkin-carving.md"
 route ctx8 "deploying the billing service to staging again" "/x" >/dev/null

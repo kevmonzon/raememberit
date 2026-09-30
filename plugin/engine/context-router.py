@@ -114,11 +114,20 @@ def frontmatter(path):
 
 
 def skill_sources():
+    """Every command and skill file that actually exists.
+
+    A skills directory can hold a DANGLING SYMLINK — a skill that was moved or uninstalled while its
+    link stayed — and glob() returns it while stat() raises. Measured on the first real machine this
+    ran on: the router crashed on `skills/<name>/SKILL.md` pointing nowhere, on every prompt. A hook
+    must never break a prompt, so anything that cannot be stat'ed is simply not a source.
+    """
     out = []
     for f in sorted((CONFIG / "commands").glob("*.md")):
-        out.append(("command", f))
+        if f.is_file():
+            out.append(("command", f))
     for f in sorted((CONFIG / "skills").glob("*/SKILL.md")):
-        out.append(("skill", f))
+        if f.is_file():
+            out.append(("skill", f))
     return out
 
 
@@ -239,4 +248,8 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as e:  # a hook must never break a prompt; say why on stderr and exit clean
+        print(f"raememberit context-router: {type(e).__name__}: {e}", file=sys.stderr)
+        sys.exit(0)
