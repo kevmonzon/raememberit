@@ -150,7 +150,8 @@ E=$(bash "$ROOT/tools/test-plugin.sh"       | tail -1 | awk '{print $1}')
 F=$(bash "$ROOT/tools/test-tripwire.sh"     | tail -1 | awk '{print $1}')
 G=$(bash "$ROOT/tools/test-context.sh"      | tail -1 | awk '{print $1}')
 H=$(bash "$ROOT/tools/test-wizard.sh"       | tail -1 | awk '{print $1}')
-TOT=$((A+B+C+D+E+F+G+H))
+I=$(bash "$ROOT/tools/test-eval.sh"         | tail -1 | awk '{print $1}')
+TOT=$((A+B+C+D+E+F+G+H+I))
 for f in README.md docs/development.md; do
   claimed=$(grep -oE '[0-9]+ (automated )?assertions' "$ROOT/$f" | head -1 | awk '{print $1}')
   if [ -z "$claimed" ]; then ok "$f claims no assertion count"

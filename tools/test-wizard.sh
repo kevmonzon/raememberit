@@ -93,6 +93,10 @@ grep -q 'edited 1 of the memory commands' "$W/o4" && ok "it warns about the edit
 grep -q 'you changed some of the background tools yourself (require-log.sh' "$W/o4" && ok "it names the tool the person patched" || bad "patched tool not named" "$(cat "$W/o4")"
 grep -q 'old version is kept at' "$W/o4" && [ -d "$T/raememberit/engine.prev" ] && ok "and keeps the old version, saying where" || bad "old version not kept"
 grep -q 'my edit' "$T/commands/learn.md" && ok "the edited command survived" || bad "edited command overwritten"
+# A bytecode cache Python left behind is not an edit: status must not report an update for it.
+mkdir -p "$T/raememberit/engine/eval/__pycache__"; printf 'bytecode' > "$T/raememberit/engine/eval/__pycache__/run_eval.cpython-314.pyc"
+bash "$K/raememberit" status --config-dir "$T" >"$W/o5" 2>&1; rc=$?
+[ "$rc" = 0 ] && ! grep -q 'cpython' "$W/o5" && ok "a __pycache__ in the engine is not reported as your edit" || bad "bytecode cache reported as an edit (rc=$rc)" "$(grep -i 'tools\|update' "$W/o5")"
 grep -q '# newer' "$T/raememberit/engine/hooks/close-log.sh" && ok "the tools were actually updated" || bad "tools not updated"
 grep -q 'tools updated to 9.9.9' "$W/o4" && ok "the summary states the new version" || bad "summary missing"
 no_jargon "update" "$W/o4"
@@ -127,7 +131,7 @@ echo "=== update keeps the route the person installed on ==="
 # update available for ever. Measured 2026-10-01 across three old versions and all three routes.
 TA="$W/asp/.claude"; mkdir -p "$TA"
 bash "$ROOT/install.sh" --as-plugin --config-dir "$TA" --no-guided --user Pat >/dev/null 2>&1
-printf '\n# older\n' >> "$TA/skills/raememberit/engine/hooks/close-log.sh"; (cd "$TA/skills/raememberit" && find . -type f ! -name '.raememberit-placed' ! -name '.DS_Store' | sort | xargs shasum | shasum | awk '{print $1}') > "$TA/skills/raememberit/.raememberit-placed"
+printf '\n# older\n' >> "$TA/skills/raememberit/engine/hooks/close-log.sh"; (cd "$TA/skills/raememberit" && find . -type f ! -name '.raememberit-placed' ! -name '.DS_Store' ! -path '*/__pycache__/*' ! -name '*.pyc' | sort | xargs shasum | shasum | awk '{print $1}') > "$TA/skills/raememberit/.raememberit-placed"   # mirrors plugin_fp in install.sh
 bash "$WIZ" update --yes --config-dir "$TA" >"$W/a1" 2>&1; rc=$?
 [ "$rc" = 0 ] && ok "as-plugin: update finishes" || bad "as-plugin update rc=$rc" "$(tail -5 "$W/a1")"
 ! grep -q '# older' "$TA/skills/raememberit/engine/hooks/close-log.sh" && ok "as-plugin: the plugin's own engine was updated" || bad "as-plugin: plugin engine still old"

@@ -6,6 +6,18 @@ behind each change lives in the commit that made it — `git log` is the long fo
 Versions before `0.4.0` predate this file; their history is in `git log` and is not reconstructed
 here, because a changelog written after the fact from subject lines is a guess wearing a date.
 
+## 0.6.4
+
+### A Python bytecode cache was reported as an edit you made
+
+Importing the eval harness, which anything that runs it in-process does, leaves
+`engine/eval/__pycache__/` behind. The engine record counted that as a change to the tools, so
+`status` said an update was due and the update preview said "you changed some of the background
+tools yourself (run_eval.cpython-314.pyc)" about an install nobody had touched. The engine
+record, the plugin fingerprint and the "is the engine current" check now all ignore
+`__pycache__`, `*.pyc` and `.DS_Store`. Three assertions in `tools/test-install.sh` and one in
+`tools/test-wizard.sh` pin it.
+
 ## 0.6.3
 
 ### The eval harness said MISS when it meant "that file is not here any more"

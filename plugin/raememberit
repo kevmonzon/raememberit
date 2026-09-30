@@ -110,9 +110,10 @@ engine_changed() {  # prints the changed files, or "unknown" when there is no re
   [ -d "$eng" ] || return 0
   if [ ! -f "$man" ]; then printf 'unknown'; return 0; fi
   # basenames only: the folder a tool lives in is not something the person needs to know
-  (cd "$eng" && find . -type f | sort | xargs shasum 2>/dev/null) | diff "$man" - | grep '^[<>]' | awk '{print $3}' | sed 's|.*/||' | sort -u
+  # Same exclusions as the installer's manifest: a __pycache__ Python wrote is not an edit.
+  (cd "$eng" && find . -type f ! -path '*/__pycache__/*' ! -name '*.pyc' ! -name '.DS_Store' | sort | xargs shasum 2>/dev/null) | diff "$man" - | grep '^[<>]' | awk '{print $3}' | sed 's|.*/||' | sort -u
 }
-engine_current() { [ -z "$(diff -rq "$SRC/engine" "$(installed_engine)" 2>/dev/null | grep -v settings.fragment.json)" ]; }
+engine_current() { [ -z "$(diff -rq -x __pycache__ -x '*.pyc' -x .DS_Store "$SRC/engine" "$(installed_engine)" 2>/dev/null | grep -v settings.fragment.json)" ]; }
 # WHICH WAY IT WAS INSTALLED. The front door used to run the recommended route for every update,
 # whatever route the person had installed on. On an --as-plugin install that left the old engine
 # inside the plugin and put a second one in the config dir: status reported an update available

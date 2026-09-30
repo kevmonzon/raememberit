@@ -8,7 +8,7 @@ How the project checks itself, and how to change it without breaking the checks.
 tools/test-all.sh
 ```
 
-482 assertions across nine suites, plus the plugin lifecycle cycle and the upgrade matrix outside them. CI runs the same
+498 assertions across ten suites, plus the plugin lifecycle cycle and the upgrade matrix outside them. CI runs the same
 command on Ubuntu and on macOS's bash 3.2, and the sanitization gate is the pre-commit hook.
 
 | Suite | Asserts |

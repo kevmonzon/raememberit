@@ -92,7 +92,7 @@ find_predecessor_hooks() {
 # Fingerprint of a plugin tree, PATH-RELATIVE so the source tree and a placed copy compare equal.
 # The record file itself and Finder droppings are excluded, or the copy could never match its source.
 PLACEMARK=".raememberit-placed"
-plugin_fp() { (cd "$1" && find . -type f ! -name "$PLACEMARK" ! -name '.DS_Store' | sort | xargs shasum 2>/dev/null | shasum | awk '{print $1}'); }
+plugin_fp() { (cd "$1" && find . -type f ! -name "$PLACEMARK" ! -name '.DS_Store' ! -path '*/__pycache__/*' ! -name '*.pyc' | sort | xargs shasum 2>/dev/null | shasum | awk '{print $1}'); }
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -153,7 +153,7 @@ if [ "$CHECK" = 1 ]; then
   say "Engine"
   if [ -d "$IENG" ]; then
     # settings.fragment.json is standalone wiring the plugin route does not ship; not drift.
-    DRIFT=$(diff -rq "$SRC/engine" "$IENG" 2>/dev/null | grep -v 'settings.fragment.json' || true)
+    DRIFT=$(diff -rq -x __pycache__ -x '*.pyc' -x .DS_Store "$SRC/engine" "$IENG" 2>/dev/null | grep -v 'settings.fragment.json' || true)
     if [ -z "$DRIFT" ]; then ok "installed engine is identical to this checkout"
     else stale=1; warn "installed engine differs from this checkout:"; printf '%s\n' "$DRIFT" | sed 's/^/      /'; fi
   else warn "no engine at $IENG"; fi
@@ -316,6 +316,7 @@ if [ "$ASPLUGIN" = 1 ]; then
       run rm -rf "$SKILLDIR"
       run mkdir -p "$(dirname "$SKILLDIR")"
       run cp -R "$SRC/plugin" "$SKILLDIR"
+      [ "$DRY" = 1 ] || find "$SKILLDIR" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
       [ "$DRY" = 1 ] || printf '%s\n' "$NEWFP" > "$SKILLDIR/$PLACEMARK"
       PLACED=1
       case "$paction" in
@@ -394,7 +395,10 @@ else
   # stale engine.prev, so its presence means exactly one thing: the last upgrade found local changes.
   # An install with no record (before 0.6.0) cannot be compared, so its engine is kept once regardless.
   EMAN="$TARGET/raememberit/.installed-engine"
-  engine_manifest() { (cd "$1" && find . -type f | sort | xargs shasum 2>/dev/null); }
+  # Bytecode caches and Finder droppings are not the person's edits: Python writes __pycache__ the
+  # first time anything imports the eval harness, and that read "you changed some of the background
+  # tools yourself (run_eval.cpython-314.pyc)" on an install nobody had touched. Measured 2026-10-01.
+  engine_manifest() { (cd "$1" && find . -type f ! -path '*/__pycache__/*' ! -name '*.pyc' ! -name '.DS_Store' | sort | xargs shasum 2>/dev/null); }
   if [ -d "$TARGET/raememberit/engine" ]; then
     if [ -f "$EMAN" ]; then
       CHANGED=$(engine_manifest "$TARGET/raememberit/engine" | diff "$EMAN" - | grep '^[<>]' | awk '{print $3}' | sort -u || true)
@@ -414,6 +418,8 @@ else
   fi
   run rm -rf "$TARGET/raememberit/engine"
   run cp -R "$SRC/engine" "$TARGET/raememberit/engine"
+  # A download that has run the eval harness in-process carries __pycache__; it is not part of the engine.
+  [ "$DRY" = 1 ] || find "$TARGET/raememberit/engine" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
   run cp "$SRC/tools/check-filled.sh" "$TARGET/raememberit/"
   [ "$DRY" = 1 ] || engine_manifest "$TARGET/raememberit/engine" > "$EMAN"
   ok "engine/ installed (hooks resolve via \${CLAUDE_CONFIG_DIR:-\$HOME/.claude})"

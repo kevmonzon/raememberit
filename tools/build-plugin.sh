@@ -21,6 +21,8 @@ cd "$ROOT"
 # work at the plugin root as at the config-dir path — which is exactly why no rewriting is needed.
 rm -rf plugin/engine
 cp -R engine plugin/engine
+# A working tree that has run the eval harness in-process carries __pycache__; it must not ship.
+find plugin/engine -name '__pycache__' -type d -prune -exec rm -rf {} +
 # The settings fragment is the standalone wiring; a plugin user never merges it, so it is not shipped.
 rm -f plugin/engine/settings.fragment.json
 

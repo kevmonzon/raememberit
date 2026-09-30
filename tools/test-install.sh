@@ -199,7 +199,7 @@ echo "=== a locally patched engine is named and kept on upgrade, never silently 
 # The engine is replaced wholesale by design. A local patch to it — the truncation tripwire lived as
 # one for a day before it was upstreamed — vanished without a word on the next re-run.
 ckt "the install records an engine manifest"  "[ -s '$T/raememberit/.installed-engine' ]"
-ckt "the manifest covers every engine file"   "[ \"\$(wc -l < '$T/raememberit/.installed-engine' | tr -d ' ')\" = \"\$(find '$T/raememberit/engine' -type f | wc -l | tr -d ' ')\" ]"
+ckt "the manifest covers every engine file"   "[ \"\$(wc -l < '$T/raememberit/.installed-engine' | tr -d ' ')\" = \"\$(find '$T/raememberit/engine' -type f ! -path '*/__pycache__/*' ! -name '*.pyc' ! -name '.DS_Store' | wc -l | tr -d ' ')\" ]"
 printf '\n# LOCAL PATCH\n' >> "$T/raememberit/engine/hooks/close-log.sh"
 "$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-eng" 2>&1
 ckt "the upgrade names the patched file"          "grep -q 'close-log.sh' '$T/log-eng'"
@@ -209,6 +209,14 @@ ckt "and a runnable diff is printed"              "grep -q 'diff -r .*engine.pre
 "$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-eng2" 2>&1
 ckt "a clean upgrade removes the stale engine.prev" "[ ! -d '$T/raememberit/engine.prev' ]"
 ckt "and reports no local changes"                  "! grep -q 'differs from what the installer wrote' '$T/log-eng2'"
+# Python writes __pycache__ the first time anything imports the eval harness. That is not the
+# person's edit, and it read as one: "you changed some of the background tools yourself
+# (run_eval.cpython-314.pyc)" on an install nobody had touched (2026-10-01).
+mkdir -p "$T/raememberit/engine/eval/__pycache__"; printf 'bytecode' > "$T/raememberit/engine/eval/__pycache__/run_eval.cpython-314.pyc"
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-eng-pyc" 2>&1
+ckt "a bytecode cache is not reported as a local patch" "! grep -q 'cpython' '$T/log-eng-pyc'"
+ckt "and does not make the upgrade keep engine.prev"    "[ ! -d '$T/raememberit/engine.prev' ]"
+ckt "the manifest does not list the cache either"       "! grep -q 'pycache' '$T/raememberit/.installed-engine'"
 # An install from before the record: the engine cannot be compared, so it is kept once regardless.
 rm "$T/raememberit/.installed-engine"
 "$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-eng3" 2>&1
