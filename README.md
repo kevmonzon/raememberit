@@ -247,6 +247,14 @@ a runnable `diff`, so the warning can be acted on rather than merely noted. `--f
 the shipped versions anyway; it is deliberately **separate** from `--force`, because topping up a
 scaffold should never be a reason to discard someone's command text.
 
+**The plugin directory follows the same policy.** `--as-plugin` records a fingerprint of what it
+placed (`skills/raememberit/.raememberit-placed`), so a re-run upgrades a directory you never touched
+and skips one you edited, saying so. `--replace-plugin` takes the shipped tree anyway, and is separate
+from `--force` for the same reason: the one flag that used to do both re-seeded starter rules into a
+corpus that had deliberately deleted them. A directory placed before the record existed is recorded on
+sight if it is still byte-identical to the source; if it differs, it is treated as unknown provenance
+and needs `--replace-plugin` once.
+
 Without the manifest the only safe policy would be "never update", stranding everyone on whatever
 version they first installed. With it, upgrades reach untouched files and stop at edited ones — the
 same reason a package manager treats config files this way.
@@ -282,7 +290,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-275 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+286 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

@@ -19,10 +19,12 @@
 # about to do, and never writes to your CLAUDE.md unasked.
 #   ./install.sh --force                           # also top up an existing corpus scaffold
 #   ./install.sh --force-commands                  # also overwrite commands YOU have edited
+#   ./install.sh --replace-plugin                  # also replace a plugin directory YOU have edited
 #
-# --force and --force-commands are deliberately SEPARATE. Conflating them would mean that topping up
-# a scaffold silently discards command customizations, which is exactly the kind of coupling that
-# loses work.
+# --force, --force-commands and --replace-plugin are deliberately SEPARATE. Conflating them would mean
+# that topping up a scaffold silently discards command customizations — or, as it once did, that the
+# only way to upgrade the plugin route also re-seeded starter rules into a corpus that had deleted them.
+# One flag, one irreversible thing.
 #
 # It will NOT:
 #   - touch credentials, or any *.local.json
@@ -37,7 +39,7 @@ set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 TARGET_EXPLICIT=0   # set when --config-dir names a target, which then outranks ambient variables
-USERNAME=""; PERSONA=""; VOCAB=""; FORCE=0; FORCECMD=0; DRY=0; GUIDED=auto; PLUGINMODE=0; ASPLUGIN=0; HFP=0
+USERNAME=""; PERSONA=""; VOCAB=""; FORCE=0; FORCECMD=0; REPLACEPLUGIN=0; DRY=0; GUIDED=auto; PLUGINMODE=0; ASPLUGIN=0; HFP=0
 SHIM=""   # in --plugin mode, the discovered stable path of the write helper
 
 say()  { printf '\033[1;36m▸ %s\033[0m\n' "$*"; }
@@ -78,6 +80,11 @@ find_predecessor_hooks() {
   printf '%s' "$found" | grep -v '^$' | sort -u
 }
 
+# Fingerprint of a plugin tree, PATH-RELATIVE so the source tree and a placed copy compare equal.
+# The record file itself and Finder droppings are excluded, or the copy could never match its source.
+PLACEMARK=".raememberit-placed"
+plugin_fp() { (cd "$1" && find . -type f ! -name "$PLACEMARK" ! -name '.DS_Store' | sort | xargs shasum 2>/dev/null | shasum | awk '{print $1}'); }
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --config-dir) TARGET="${2:?}"; TARGET_EXPLICIT=1; shift 2 ;;
@@ -86,6 +93,7 @@ while [ $# -gt 0 ]; do
     --vocabulary) VOCAB="${2:?}"; shift 2 ;;
     --force)      FORCE=1; shift ;;
     --force-commands) FORCECMD=1; shift ;;
+    --replace-plugin) REPLACEPLUGIN=1; shift ;;
     --dry-run)    DRY=1; shift ;;
     --guided)     GUIDED=1; shift ;;
     --no-guided)  GUIDED=0; shift ;;
@@ -210,17 +218,55 @@ say "Engine"
 if [ "$ASPLUGIN" = 1 ]; then
   SKILLDIR="$TARGET/skills/raememberit"
   [ -d "$SRC/plugin" ] || die "no plugin/ next to install.sh — run tools/build-plugin.sh first"
-  # Never clobber a plugin directory someone has edited: same principle as the command manifest.
+  # THE SAME FOUR-STATE POLICY THE COMMANDS GET, because the plugin directory had the worse half of it.
+  # It refused to clobber an existing directory — right, someone may have edited it — but that made a
+  # re-run a NO-OP for everyone who had not, and "re-run to upgrade" quietly stopped being true on this
+  # route. Measured 2026-09-30: a marker planted in the placed engine survived the documented upgrade.
+  # The escape hatch was --force, which ALSO tops up the corpus scaffold, so upgrading the plugin
+  # re-seeded starter rules a corpus had deliberately deleted. So: a fingerprint of what was placed is
+  # recorded inside the directory, and the four cases separate:
+  #   absent                                   -> place
+  #   identical to the source                  -> current (and record it, if a pre-record install)
+  #   matches the record — ours, untouched     -> update
+  #   differs from the record, or no record    -> SKIP, and say so; --replace-plugin overrides
   PLACED=0
-  if [ -d "$SKILLDIR" ] && [ "$FORCE" != 1 ]; then
-    warn "$SKILLDIR already exists — left alone. Pass --force to replace it."
+  NEWFP=$(plugin_fp "$SRC/plugin")
+  if [ ! -d "$SKILLDIR" ]; then paction=place
   else
-    run rm -rf "$SKILLDIR"
-    run mkdir -p "$(dirname "$SKILLDIR")"
-    run cp -R "$SRC/plugin" "$SKILLDIR"
-    PLACED=1
-    ok "plugin placed at $SKILLDIR (auto-loads as raememberit@skills-dir; no settings entry needed)"
+    CURFP=$(plugin_fp "$SKILLDIR")
+    RECFP=$(cat "$SKILLDIR/$PLACEMARK" 2>/dev/null || true)
+    if   [ "$CURFP" = "$NEWFP" ];       then paction=current
+    elif [ "$REPLACEPLUGIN" = 1 ];      then paction=replace
+    elif [ -z "$RECFP" ];               then paction=skip-unknown
+    elif [ "$CURFP" = "$RECFP" ];       then paction=update
+    else                                     paction=skip-edited
+    fi
   fi
+  case "$paction" in
+    place|update|replace)
+      run rm -rf "$SKILLDIR"
+      run mkdir -p "$(dirname "$SKILLDIR")"
+      run cp -R "$SRC/plugin" "$SKILLDIR"
+      [ "$DRY" = 1 ] || printf '%s\n' "$NEWFP" > "$SKILLDIR/$PLACEMARK"
+      PLACED=1
+      case "$paction" in
+        place)   ok "plugin placed at $SKILLDIR (auto-loads as raememberit@skills-dir; no settings entry needed)" ;;
+        update)  ok "plugin at $SKILLDIR was ours and untouched — updated to this version" ;;
+        replace) warn "--replace-plugin given: replaced $SKILLDIR, discarding whatever was there" ;;
+      esac ;;
+    current)
+      PLACED=1
+      ok "plugin at $SKILLDIR is already this version"
+      # A directory placed before this record existed, still byte-identical to the source, is
+      # provably untouched — record it now so the NEXT upgrade flows without a flag.
+      [ "$DRY" = 1 ] || [ -f "$SKILLDIR/$PLACEMARK" ] || printf '%s\n' "$NEWFP" > "$SKILLDIR/$PLACEMARK" ;;
+    skip-edited)
+      warn "$SKILLDIR — YOU edited this since it was placed; left alone."
+      warn "  Pass --replace-plugin to take the shipped version instead (your edits would be lost)." ;;
+    skip-unknown)
+      warn "$SKILLDIR exists and was not placed by this installer (or predates the record); left alone."
+      warn "  Pass --replace-plugin to replace it with the shipped version." ;;
+  esac
 
   # A skills-dir install has NO version component in its path, so the wrapper that exists for the
   # marketplace case is unnecessary here: name the engine itself and the rule still never moves.
@@ -247,7 +293,7 @@ if [ "$ASPLUGIN" = 1 ]; then
     warn "to point a permission rule at, and adding one anyway would grant nothing while looking fine:"
     warn "every memory write would just start prompting."
     warn ""
-    warn "  ./install.sh --as-plugin --force    replace it with the current plugin"
+    warn "  ./install.sh --as-plugin --replace-plugin    replace it with the current plugin"
     warn ""
     warn "If that directory is deliberate — a plugin supplying hooks while the engine lives in the"
     warn "config dir — then --as-plugin is the wrong route for this setup and would move the engine"

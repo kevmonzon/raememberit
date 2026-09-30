@@ -8,6 +8,21 @@ here, because a changelog written after the fact from subject lines is a guess w
 
 ## Unreleased
 
+### The plugin route could not be upgraded by re-running the installer
+
+`--as-plugin` refused to touch an existing `skills/raememberit/` without `--force` — right for
+a directory someone edited, wrong for everyone else, because "re-run to upgrade" silently stopped
+being true on that route. A marker planted in the placed engine survived the documented upgrade.
+And `--force`, the only way past it, also tops up the corpus scaffold, so upgrading the plugin
+re-seeded starter rules into a corpus that had deliberately deleted them (the 2026-09-28 accident,
+reproduced on demand).
+
+The directory now carries a record of what was placed, and a re-run applies the same four-state
+policy the commands have: untouched, update; edited, skip and say so. **`--replace-plugin`** is the
+new, separate override. `--force` no longer replaces the plugin directory. A directory placed by an
+earlier version is recorded on sight if it still matches the source; one that differs needs
+`--replace-plugin` once, after which upgrades flow.
+
 ### The `SessionEnd` index rebuild was cancelled on every exit
 
 `rebuild-index-hook.sh` ran the rebuild in the foreground. On exit the harness gives

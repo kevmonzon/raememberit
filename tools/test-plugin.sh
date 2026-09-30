@@ -354,14 +354,52 @@ EOF
     && ok "the path the rule names actually writes a memory" \
     || bad "the rule names a path that cannot write"
 fi
-# An existing skills dir is someone's, possibly edited: same principle as the command manifest.
+# THE UPGRADE PATH ON THIS ROUTE. The directory carries a record of what was placed, and a re-run
+# treats it the way the command manifest treats a command: untouched means update, edited means skip.
+# Before the record existed a re-run was a NO-OP for everyone (measured 2026-09-30), and the only way
+# past it also re-seeded starter rules into the corpus.
+pfp() { (cd "$1" && find . -type f ! -name '.raememberit-placed' ! -name '.DS_Store' | sort | xargs shasum 2>/dev/null | shasum | awk '{print $1}'); }
+[ -f "$SK/.raememberit-placed" ] && ok "placing records a fingerprint of what was placed" \
+                                 || bad "no placement record written"
+[ "$(cat "$SK/.raememberit-placed")" = "$(pfp "$SK")" ] \
+  && ok "the record matches the placed tree" || bad "the record does not match the placed tree"
+out4b="$(bash install.sh --as-plugin --config-dir "$t4" --no-guided 2>&1)"
+printf '%s' "$out4b" | grep -q 'already this version' \
+  && ok "an identical re-run reports the plugin as current" || bad "identical re-run did not say current"
+# Simulate an OLDER placed version that was never edited: change a file, and make the record agree.
+echo "# OLD-ENGINE" >> "$SK/engine/mem-write.sh"; pfp "$SK" > "$SK/.raememberit-placed"
+out4c="$(bash install.sh --as-plugin --config-dir "$t4" --no-guided 2>&1)"
+grep -q 'OLD-ENGINE' "$SK/engine/mem-write.sh" \
+  && bad "an untouched older plugin was NOT upgraded by a plain re-run" \
+  || ok "an untouched older plugin is upgraded by a plain re-run"
+printf '%s' "$out4c" | grep -q 'untouched — updated' && ok "and it says so" || bad "the upgrade was silent"
+# Now an EDIT the user made: file changed, record not updated.
 marker="$SK/MINE.txt"; : > "$marker"
-bash install.sh --as-plugin --config-dir "$t4" --no-guided >/dev/null 2>&1 || true
-[ -f "$marker" ] && ok "a second run leaves an existing plugin directory alone" \
-                 || bad "a second run replaced the plugin directory without --force"
+out4d="$(bash install.sh --as-plugin --config-dir "$t4" --no-guided 2>&1)"
+[ -f "$marker" ] && ok "a plugin directory YOU edited is left alone" \
+                 || bad "an edited plugin directory was replaced without --replace-plugin"
+printf '%s' "$out4d" | grep -q 'replace-plugin' && ok "and the skip names the way out" || bad "the skip names no remedy"
 bash install.sh --as-plugin --config-dir "$t4" --no-guided --force >/dev/null 2>&1 || true
-[ -f "$marker" ] && bad "--force did not replace the plugin directory" \
-                 || ok "--force replaces it"
+[ -f "$marker" ] && ok "--force does NOT replace the plugin directory (it only tops up the scaffold)" \
+                 || bad "--force replaced the plugin directory — the flags are conflated again"
+bash install.sh --as-plugin --config-dir "$t4" --no-guided --replace-plugin >/dev/null 2>&1 || true
+[ -f "$marker" ] && bad "--replace-plugin did not replace the plugin directory" \
+                 || ok "--replace-plugin replaces it"
+# A directory from before the record existed, byte-identical to the source, gets recorded on sight.
+rm -f "$SK/.raememberit-placed"
+bash install.sh --as-plugin --config-dir "$t4" --no-guided >/dev/null 2>&1 || true
+[ -f "$SK/.raememberit-placed" ] && ok "a pre-record directory that is current gets its record written" \
+                                 || bad "a current pre-record directory stays untracked"
+# But a pre-record directory that DIFFERS is unknown provenance: skipped, like an unknown command.
+echo "# OLD-ENGINE" >> "$SK/engine/mem-write.sh"; rm -f "$SK/.raememberit-placed"
+out4e="$(bash install.sh --as-plugin --config-dir "$t4" --no-guided 2>&1)"
+grep -q 'OLD-ENGINE' "$SK/engine/mem-write.sh" && ok "a differing pre-record directory is left alone" \
+                                                || bad "a differing pre-record directory was replaced"
+printf '%s' "$out4e" | grep -q 'not placed by this installer' && ok "and the reason is stated" || bad "no reason given"
+# --dry-run must classify without writing, on this route too.
+: > "$marker"
+bash install.sh --as-plugin --config-dir "$t4" --no-guided --replace-plugin --dry-run >/dev/null 2>&1 || true
+[ -f "$marker" ] && ok "--dry-run with --replace-plugin still replaces nothing" || bad "--dry-run replaced the plugin directory"
 rm -rf "$(dirname "$t4")"
 
 echo "== the two routes must not double each other =="
@@ -432,14 +470,14 @@ out8="$(bash install.sh --as-plugin --config-dir "$t8" --no-guided 2>&1)"; rc8=$
                   || bad "proceeded against a plugin directory that ships no engine"
 printf '%s' "$out8" | grep -q 'start prompting' \
   && ok "the refusal explains the silent failure it prevents" || bad "the refusal does not explain itself"
-printf '%s' "$out8" | grep -q -- '--as-plugin --force' \
+printf '%s' "$out8" | grep -q -- '--as-plugin --replace-plugin' \
   && ok "the refusal names the way out" || bad "the refusal names no remedy"
 # And it must die BEFORE writing anything.
 [ -f "$t8/settings.json" ] && bad "the refused run still wrote settings.json" \
                            || ok "nothing was written before the refusal"
-# --force recovers, and then every Bash rule names a file that is really there.
-bash install.sh --as-plugin --config-dir "$t8" --no-guided --force >/dev/null 2>&1 \
-  && ok "--force replaces the stale directory and completes" || bad "--force did not recover"
+# --replace-plugin recovers, and then every Bash rule names a file that is really there.
+bash install.sh --as-plugin --config-dir "$t8" --no-guided --replace-plugin >/dev/null 2>&1 \
+  && ok "--replace-plugin replaces the stale directory and completes" || bad "--replace-plugin did not recover"
 python3 -c 'import json,os,sys
 d=json.load(open("'"$t8"'/settings.json")); a=d.get("permissions",{}).get("allow",[])
 b=[r for r in a if r.startswith("Bash(")]
