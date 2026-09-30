@@ -181,6 +181,37 @@ ckt "their own memory untouched"     "[ -f '$MEM/feedback/their-own-rule.md' ]"
 ck  "their user_profile NOT overwritten" "$(cat "$MEM/user_profile.md")" "custom"
 ckt "re-run reported leaving the corpus alone" "grep -qi 'left completely alone' '$T/log2'"
 
+echo "=== the install records what it is, and --check can tell it from the checkout ==="
+# Nothing recorded which version a config dir ran: the engine carried no marker and the commands
+# were frozen by design, so "am I current?" had no answer short of a diff by hand.
+V="$(tr -d ' \n' < "$ROOT/VERSION")"
+ckt "version recorded in .config"       "grep -qx 'version=$V' '$T/raememberit/.config'"
+ckt "corpus schema recorded in .config" "grep -qx 'schema=1' '$T/raememberit/.config'"
+FP_CHK="$(fp_all "$T")"
+# the log goes OUTSIDE the target, or it would itself be the change the fingerprint catches
+"$ROOT/install.sh" --check --config-dir "$T" >"$T.log-check" 2>&1
+ck  "--check exits 0 on a current install"   "$?" "0"
+ckt "--check says current"                   "grep -q 'current' '$T.log-check'"
+ckt "--check names the route"                "grep -q 'route:' '$T.log-check'"
+ck  "--check wrote nothing"                  "$(fp_all "$T")" "$FP_CHK"
+rm -f "$T.log-check"
+# A newer checkout: copy the kit, bump its VERSION, change one engine file, and check from THERE.
+K="${TMPDIR:-/tmp}/raememberit-newer.$$"; rm -rf "$K"; mkdir -p "$K"
+for x in install.sh uninstall.sh VERSION engine protocol tools starter scaffold; do cp -R "$ROOT/$x" "$K/"; done
+printf '9.9.9\n' > "$K/VERSION"; printf '\n# newer\n' >> "$K/engine/hooks/close-log.sh"
+"$K/install.sh" --check --config-dir "$T" >"$T/log-check2" 2>&1
+ck  "--check exits 1 when the checkout is newer"  "$?" "1"
+ckt "it names the engine file that would change" "grep -q 'close-log.sh' '$T/log-check2'"
+ckt "it shows both versions"                     "grep -q '9.9.9' '$T/log-check2' && grep -q "$V" '$T/log-check2'"
+ckt "and prints the exact re-run for the route"  "grep -q 'install.sh .*--config-dir' '$T/log-check2'"
+rm -rf "$K"
+# A corpus recorded with a NEWER schema than this installer knows is refused, not guessed at.
+cp "$T/raememberit/.config" "$T/cfg.bak"; printf 'schema=99\n' >> "$T/raememberit/.config"
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-schema" 2>&1
+ck  "a newer corpus schema refuses the install" "$?" "1"
+ckt "and says why"                              "grep -q 'newer than this installer' '$T/log-schema'"
+mv "$T/cfg.bak" "$T/raememberit/.config"
+
 echo "=== an over-budget always-on index does not turn an upgrade into a failure ==="
 # rebuild-index.sh exits 1 when the tier is over budget — a verdict about the corpus. Under the
 # installer's `set -e -o pipefail` that exit aborted the run at the Index step, after the engine and

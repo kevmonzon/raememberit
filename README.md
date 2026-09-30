@@ -214,7 +214,16 @@ their own.
 ./install.sh                                          # into ${CLAUDE_CONFIG_DIR:-~/.claude}
 ./install.sh --user Alex --persona ~/my-voice.md      # optional
 ./install.sh --dry-run                                # say what would change, change nothing
+./install.sh --check                                  # read-only: installed vs this checkout
 ```
+
+`--check` answers "is my install current?" — which had no answer before, because nothing recorded
+the installed version and the commands are frozen by design. It reports the route it detects, the
+installed and checkout versions, every engine file that differs, whether the generated hook wiring
+would change, and how far each installed command has drifted from its template. It exits 1 with the
+exact re-run for that route when an upgrade is available. The install records `version=` and
+`schema=` in `raememberit/.config`; the schema number names the on-disk conventions a corpus relies
+on and is what a future migration acts on, instead of guessing from file shapes.
 
 Configuration is **values, not bundles**: `--user`, and optionally `--persona FILE` and
 `--vocabulary FILE`. Everything else is an environment knob in `settings.json` (see below). There was
@@ -293,7 +302,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-312 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+324 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

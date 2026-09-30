@@ -258,7 +258,9 @@ had already shipped**.
 
 ## Stage 9 — Upgrade
 
-Re-running `install.sh` is the upgrade. The engine directory is replaced wholesale; the corpus
+`./install.sh --check` first: read-only, it names the route it detects, compares the recorded
+version and the installed engine against the checkout, and prints the exact re-run. Then
+re-running `install.sh` is the upgrade. The engine directory is replaced wholesale; the corpus
 is never overwritten; commands are treated individually against the `.installed-commands`
 manifest:
 
@@ -333,6 +335,7 @@ inspect first.
 | `<corpus>/.last-sweep` | `/skill-mine` | never (advanced) | the sweep delta and the session-start nag |
 | `raememberit/.installed-commands` | `install.sh` | `uninstall.sh` | the four-state upgrade policy for commands |
 | `skills/raememberit/.raememberit-placed` | `install.sh --as-plugin` | replacing the directory | the same policy for the plugin directory: untouched is updated, edited is skipped |
+| `raememberit/.config` | `install.sh` | `uninstall.sh` | the remembered addressee and optional files, plus `version=` and `schema=` — what `--check` and a future migration read |
 | `<corpus>/.seeded-starters` | `install.sh` | never | which starter rules this corpus ever received, so a `--force` top-up never re-adds one you deleted |
 | `raememberit/shipped/<name>` | `install.sh` on a skip | you | recovering a shipped command you chose not to take |
 | `$CLAUDE_PLUGIN_DATA/bin/mem-write.sh` | `place-shim.sh` | plugin removal | a version-free path for the permission rule |

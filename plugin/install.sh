@@ -20,6 +20,8 @@
 #   ./install.sh --force                           # also top up an existing corpus scaffold
 #   ./install.sh --force-commands                  # also overwrite commands YOU have edited
 #   ./install.sh --replace-plugin                  # also replace a plugin directory YOU have edited
+#   ./install.sh --check                           # read-only: installed vs this checkout, and what
+#                                                  # an upgrade would carry — version, engine, commands
 #
 # --force, --force-commands and --replace-plugin are deliberately SEPARATE. Conflating them would mean
 # that topping up a scaffold silently discards command customizations — or, as it once did, that the
@@ -39,7 +41,14 @@ set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 TARGET_EXPLICIT=0   # set when --config-dir names a target, which then outranks ambient variables
-USERNAME=""; PERSONA=""; VOCAB=""; FORCE=0; FORCECMD=0; REPLACEPLUGIN=0; DRY=0; GUIDED=auto; PLUGINMODE=0; ASPLUGIN=0; HFP=0
+USERNAME=""; PERSONA=""; VOCAB=""; FORCE=0; FORCECMD=0; REPLACEPLUGIN=0; DRY=0; GUIDED=auto; PLUGINMODE=0; ASPLUGIN=0; HFP=0; CHECK=0
+# ONE VERSION, read from the file at the root — never a literal here (see tools/test-docs.sh).
+VERSION="$(tr -d ' \n' < "$SRC/VERSION" 2>/dev/null || echo unknown)"
+# THE CORPUS SCHEMA, separate from the kit version. It names the on-disk conventions a corpus relies
+# on — frontmatter keys, tier semantics, the record files — and changes only when one of those does.
+# Recorded in .config so a future install can tell what it is upgrading FROM and migrate rather than
+# guess. Every change so far kept absence meaning the old behaviour; that stays the rule.
+SCHEMA=1
 SHIM=""   # in --plugin mode, the discovered stable path of the write helper
 
 say()  { printf '\033[1;36m▸ %s\033[0m\n' "$*"; }
@@ -94,6 +103,7 @@ while [ $# -gt 0 ]; do
     --force)      FORCE=1; shift ;;
     --force-commands) FORCECMD=1; shift ;;
     --replace-plugin) REPLACEPLUGIN=1; shift ;;
+    --check)      CHECK=1; shift ;;
     --dry-run)    DRY=1; shift ;;
     --guided)     GUIDED=1; shift ;;
     --no-guided)  GUIDED=0; shift ;;
@@ -121,6 +131,52 @@ say "Preflight"
 command -v jq      >/dev/null 2>&1 || die "jq is required (hooks parse their stdin with it). brew install jq"
 command -v python3 >/dev/null 2>&1 || die "python3 is required (settings merge, eval harness)"
 ok "jq $(jq --version 2>/dev/null) · python3 $(python3 -V 2>&1 | cut -d' ' -f2)"
+
+# ── --check: what is installed, what this checkout would change ──────────────────────────
+# READ-ONLY. Nothing recorded which version a config dir was running: the hooks-only plugin reported
+# whatever VERSION said at generation time, the engine carried no marker, and the commands were frozen
+# by design. So "is my install current?" had no answer short of diffing by hand. This answers it, and
+# names the exact re-run for the route it detects.
+if [ "$CHECK" = 1 ]; then
+  say "Installed"
+  CFGV="$(sed -n 's|^version=||p' "$TARGET/raememberit/.config" 2>/dev/null | tail -1)"
+  CFGS="$(sed -n 's|^schema=||p'  "$TARGET/raememberit/.config" 2>/dev/null | tail -1)"
+  PLV="$(jq -r '.version // empty' "$TARGET/skills/raememberit/.claude-plugin/plugin.json" 2>/dev/null || true)"
+  if   [ -d "$TARGET/skills/raememberit/engine" ]; then ROUTE="--as-plugin"; IENG="$TARGET/skills/raememberit/engine"
+  elif [ -f "$TARGET/skills/raememberit/hooks/hooks.json" ]; then ROUTE="--hooks-from-plugin"; IENG="$TARGET/raememberit/engine"
+  elif [ -d "$TARGET/raememberit/engine" ]; then ROUTE=""; IENG="$TARGET/raememberit/engine"
+  else die "no raememberit install found at $TARGET"; fi
+  ok "route: ./install.sh ${ROUTE:-(standalone)}"
+  ok "installed version: ${CFGV:-${PLV:-unrecorded (installed before 0.6.0)}} · checkout: $VERSION · corpus schema: ${CFGS:-unrecorded}"
+  stale=0
+  [ "${CFGV:-$PLV}" = "$VERSION" ] || stale=1
+  say "Engine"
+  if [ -d "$IENG" ]; then
+    # settings.fragment.json is standalone wiring the plugin route does not ship; not drift.
+    DRIFT=$(diff -rq "$SRC/engine" "$IENG" 2>/dev/null | grep -v 'settings.fragment.json' || true)
+    if [ -z "$DRIFT" ]; then ok "installed engine is identical to this checkout"
+    else stale=1; warn "installed engine differs from this checkout:"; printf '%s\n' "$DRIFT" | sed 's/^/      /'; fi
+  else warn "no engine at $IENG"; fi
+  if [ -f "$TARGET/skills/raememberit/hooks/hooks.json" ] && [ "$ROUTE" = "--hooks-from-plugin" ]; then
+    say "Hooks plugin"
+    GEN="${TMPDIR:-/tmp}/rmb-check.$$"; mkdir -p "$GEN"
+    python3 "$SRC/tools/gen-hooks-only-plugin.py" "$SRC/engine/settings.fragment.json" "$GEN" >/dev/null 2>&1 || true
+    if diff -q "$GEN/hooks/hooks.json" "$TARGET/skills/raememberit/hooks/hooks.json" >/dev/null 2>&1
+    then ok "generated hook wiring is current"
+    else stale=1; warn "hook wiring would change on re-run (the fragment gained or lost a hook)"; fi
+    rm -rf "$GEN"
+  fi
+  if [ "$PLUGINMODE" = 0 ] && [ -d "$TARGET/commands" ]; then
+    say "Commands"
+    # Frozen by design where edited; this is the only surface that says what the templates now carry.
+    CLAUDE_CONFIG_DIR="$TARGET" bash "$SRC/tools/diff-commands.sh" --stat 2>/dev/null | sed -n '3,$p' | sed 's/^/  /'
+  fi
+  say "Verdict"
+  if [ "$stale" = 0 ]; then ok "current — nothing to do"; exit 0; fi
+  warn "an upgrade is available. The re-run for this route:"
+  printf '      ./install.sh %s --config-dir %s --no-guided\n' "$ROUTE" "$TARGET"
+  exit 1
+fi
 
 # auto: guide a fresh interactive install; stay quiet for a re-run or a non-terminal
 if [ "$GUIDED" = auto ]; then
@@ -212,6 +268,19 @@ ok "$TARGET"
 # Plugin mode owns neither directory: the engine is in the plugin and the commands are namespaced,
 # so creating an empty raememberit/ and commands/ here would just leave litter.
 if [ "$PLUGINMODE" = 1 ]; then run mkdir -p "$TARGET"; else run mkdir -p "$TARGET/raememberit" "$TARGET/commands"; fi
+
+# ── schema migrations ─────────────────────────────────────────────────────────────────
+# Runs BEFORE the engine is replaced, against the schema the previous install recorded. There is
+# nothing to migrate yet; the step exists so the first real migration has a place to live and a
+# recorded FROM to act on, instead of guessing from file shapes. Absence means schema 1 — every
+# convention so far was introduced with absence meaning the old behaviour.
+FROM_SCHEMA="$(cfgget schema)"; FROM_SCHEMA="${FROM_SCHEMA:-1}"
+if [ "$FROM_SCHEMA" != "$SCHEMA" ]; then
+  say "Migrations"
+  case "$FROM_SCHEMA" in
+    *) die "corpus schema $FROM_SCHEMA is newer than this installer's ($SCHEMA) — upgrade the checkout, not the corpus" ;;
+  esac
+fi
 
 # ── engine ──────────────────────────────────────────────────────────────────────────
 say "Engine"
@@ -326,7 +395,8 @@ if [ "$DRY" = 1 ]; then printf '  would: record the addressee and optional file 
 elif [ -d "$TARGET/raememberit" ]; then
   { printf 'user=%s\n' "$PUSER"
     [ -n "$PERSONA" ] && printf 'persona=%s\n' "$PERSONA"
-    [ -n "$VOCAB" ]   && printf 'vocabulary=%s\n' "$VOCAB"; } > "$CFGFILE"
+    [ -n "$VOCAB" ]   && printf 'vocabulary=%s\n' "$VOCAB"
+    printf 'version=%s\nschema=%s\n' "$VERSION" "$SCHEMA"; } > "$CFGFILE"
 fi
 
 # ââ the hooks-only plugin ââââââââââââââââââââââââââââââââââ

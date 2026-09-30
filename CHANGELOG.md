@@ -8,6 +8,16 @@ here, because a changelog written after the fact from subject lines is a guess w
 
 ## Unreleased
 
+### Nothing recorded which version was installed, so nothing could say whether to upgrade
+
+The engine carried no marker, the hooks-only plugin reported whatever `VERSION` said when it was
+generated, and the commands are frozen by design. `install.sh` now records `version=` and
+`schema=` in `raememberit/.config`, and **`--check`** is a read-only comparison of an install
+against the checkout: route, versions, every engine file that differs, whether the generated hook
+wiring would change, and each command's drift from its template — exiting 1 with the exact re-run
+when an upgrade is available. The schema number is the corpus's on-disk conventions; there is a
+migrations step that has nothing to do yet and refuses a corpus newer than the installer.
+
 ### An over-budget index made an upgrade report failure
 
 `rebuild-index.sh` exits 1 when the always-on tier is over budget — a verdict about the corpus.
