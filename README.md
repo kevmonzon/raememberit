@@ -76,7 +76,11 @@ option is the intended door.
 
 A knob exists wherever an adopted setup might reasonably differ. Editing the hook scripts directly
 would not survive an upgrade — `install.sh` replaces the whole `engine/` directory — so anything worth
-keeping belongs in `settings.json` `env`, not in the script.
+keeping belongs in `settings.json` `env`, not in the script. If you patch the engine anyway, the
+upgrade will not lose it silently: the install records a manifest of the engine it wrote, and a
+re-run names every file that differs and keeps the whole previous engine at `raememberit/engine.prev`
+with a runnable `diff -r`. A clean upgrade removes that directory, so its presence means exactly one
+thing.
 
 `RAEMEMBERIT_REQUIRE_LOG` defaults to **warn**, not strict. The upstream single-user setup blocked
 the stop; that is a reasonable choice for its author and a hostile default for anyone else — a
@@ -302,7 +306,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-324 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+335 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

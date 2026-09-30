@@ -260,9 +260,10 @@ had already shipped**.
 
 `./install.sh --check` first: read-only, it names the route it detects, compares the recorded
 version and the installed engine against the checkout, and prints the exact re-run. Then
-re-running `install.sh` is the upgrade. The engine directory is replaced wholesale; the corpus
-is never overwritten; commands are treated individually against the `.installed-commands`
-manifest:
+re-running `install.sh` is the upgrade. The engine directory is replaced wholesale — but first it
+is compared against the `.installed-engine` manifest, and anything you patched is named and kept
+at `engine.prev`. The corpus is never overwritten; commands are treated individually against the
+`.installed-commands` manifest:
 
 | State of the installed command | Action |
 |---|---|
@@ -335,6 +336,8 @@ inspect first.
 | `<corpus>/.last-sweep` | `/skill-mine` | never (advanced) | the sweep delta and the session-start nag |
 | `raememberit/.installed-commands` | `install.sh` | `uninstall.sh` | the four-state upgrade policy for commands |
 | `skills/raememberit/.raememberit-placed` | `install.sh --as-plugin` | replacing the directory | the same policy for the plugin directory: untouched is updated, edited is skipped |
+| `raememberit/.installed-engine` | `install.sh` | `uninstall.sh` | the engine as written, so an upgrade can name what you patched |
+| `raememberit/engine.prev` | `install.sh`, only when the engine differed from its record | the next clean upgrade | the previous engine, kept so a local patch can be re-applied or upstreamed |
 | `raememberit/.config` | `install.sh` | `uninstall.sh` | the remembered addressee and optional files, plus `version=` and `schema=` — what `--check` and a future migration read |
 | `<corpus>/.seeded-starters` | `install.sh` | never | which starter rules this corpus ever received, so a `--force` top-up never re-adds one you deleted |
 | `raememberit/shipped/<name>` | `install.sh` on a skip | you | recovering a shipped command you chose not to take |
@@ -358,7 +361,8 @@ inspect first.
    from `settings.fragment.json`, and `tools/test-docs.sh` fails when they drift — including
    the assertion count in the README.
 6. **A knob, not an edit.** `install.sh` replaces the whole engine directory; anything
-   customized in a script is lost on upgrade, and anything in `settings.json` `env` is not.
+   customized in a script is kept aside at `engine.prev` and named, not carried forward, and
+   anything in `settings.json` `env` survives untouched.
 7. **Scanning zero files is an error, not a pass.** The sanitization gate carries no file
    exclusions — an excluded file is a blind spot, and a gate with blind spots is decoration.
 

@@ -181,6 +181,27 @@ ckt "their own memory untouched"     "[ -f '$MEM/feedback/their-own-rule.md' ]"
 ck  "their user_profile NOT overwritten" "$(cat "$MEM/user_profile.md")" "custom"
 ckt "re-run reported leaving the corpus alone" "grep -qi 'left completely alone' '$T/log2'"
 
+echo "=== a locally patched engine is named and kept on upgrade, never silently replaced ==="
+# The engine is replaced wholesale by design. A local patch to it — the truncation tripwire lived as
+# one for a day before it was upstreamed — vanished without a word on the next re-run.
+ckt "the install records an engine manifest"  "[ -s '$T/raememberit/.installed-engine' ]"
+ckt "the manifest covers every engine file"   "[ \"\$(wc -l < '$T/raememberit/.installed-engine' | tr -d ' ')\" = \"\$(find '$T/raememberit/engine' -type f | wc -l | tr -d ' ')\" ]"
+printf '\n# LOCAL PATCH\n' >> "$T/raememberit/engine/hooks/close-log.sh"
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-eng" 2>&1
+ckt "the upgrade names the patched file"          "grep -q 'close-log.sh' '$T/log-eng'"
+ckt "the previous engine is kept at engine.prev"  "grep -q 'LOCAL PATCH' '$T/raememberit/engine.prev/hooks/close-log.sh'"
+ckt "the installed engine is the shipped one"     "! grep -q 'LOCAL PATCH' '$T/raememberit/engine/hooks/close-log.sh'"
+ckt "and a runnable diff is printed"              "grep -q 'diff -r .*engine.prev' '$T/log-eng'"
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-eng2" 2>&1
+ckt "a clean upgrade removes the stale engine.prev" "[ ! -d '$T/raememberit/engine.prev' ]"
+ckt "and reports no local changes"                  "! grep -q 'differs from what the installer wrote' '$T/log-eng2'"
+# An install from before the record: the engine cannot be compared, so it is kept once regardless.
+rm "$T/raememberit/.installed-engine"
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-eng3" 2>&1
+ckt "with no record, the previous engine is kept"  "[ -d '$T/raememberit/engine.prev' ]"
+ckt "and the reason is stated"                     "grep -q 'no engine record' '$T/log-eng3'"
+ckt "a record is written for next time"            "[ -s '$T/raememberit/.installed-engine' ]"
+
 echo "=== the install records what it is, and --check can tell it from the checkout ==="
 # Nothing recorded which version a config dir ran: the engine carried no marker and the commands
 # were frozen by design, so "am I current?" had no answer short of a diff by hand.

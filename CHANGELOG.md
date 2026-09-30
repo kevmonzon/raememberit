@@ -8,6 +8,15 @@ here, because a changelog written after the fact from subject lines is a guess w
 
 ## Unreleased
 
+### A local patch to the installed engine vanished silently on upgrade
+
+Documented as "a knob, not an edit", and it still happened: the truncation tripwire lived as a
+local patch to the installed engine for a day before it was upstreamed, and one re-run in that
+window would have deleted it without a word. The install now records a manifest of the engine it
+wrote; an upgrade names every file that differs from it and keeps the whole previous engine at
+`raememberit/engine.prev` with a runnable `diff -r`. A clean upgrade removes that directory. An
+install with no record yet — anything before this version — keeps its engine once regardless.
+
 ### Nothing recorded which version was installed, so nothing could say whether to upgrade
 
 The engine carried no marker, the hooks-only plugin reported whatever `VERSION` said when it was

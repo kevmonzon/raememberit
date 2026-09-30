@@ -384,9 +384,38 @@ elif [ "$PLUGINMODE" = 1 ]; then
     warn "Everything else below still applies; re-run this with --plugin afterwards to add the rule."
   fi
 else
+  # THE ENGINE IS REPLACED WHOLESALE, AND A LOCAL PATCH TO IT VANISHED SILENTLY. That is documented
+  # ("a knob, not an edit") and still happened: the truncation tripwire lived as a local patch to the
+  # installed engine for a day before it was upstreamed, and one upgrade in that window would have
+  # deleted it without a word. So the install records a manifest of the engine it wrote
+  # (.installed-engine, one `sha  relative-path` per line), and an upgrade compares the engine it is
+  # about to remove against that record. Anything that differs is NAMED, and the whole previous engine
+  # is kept at engine.prev so the patch can be re-applied or upstreamed. A clean upgrade removes any
+  # stale engine.prev, so its presence means exactly one thing: the last upgrade found local changes.
+  # An install with no record (before 0.6.0) cannot be compared, so its engine is kept once regardless.
+  EMAN="$TARGET/raememberit/.installed-engine"
+  engine_manifest() { (cd "$1" && find . -type f | sort | xargs shasum 2>/dev/null); }
+  if [ -d "$TARGET/raememberit/engine" ]; then
+    if [ -f "$EMAN" ]; then
+      CHANGED=$(engine_manifest "$TARGET/raememberit/engine" | diff "$EMAN" - | grep '^[<>]' | awk '{print $3}' | sort -u || true)
+    else
+      CHANGED="(no engine record — installed before 0.6.0, so local patches cannot be told apart)"
+    fi
+    if [ -n "$CHANGED" ]; then
+      warn "the installed engine differs from what the installer wrote:"
+      printf '%s\n' "$CHANGED" | sed 's/^/      /'
+      run rm -rf "$TARGET/raememberit/engine.prev"
+      run cp -R "$TARGET/raememberit/engine" "$TARGET/raememberit/engine.prev"
+      warn "  previous engine kept at $TARGET/raememberit/engine.prev — re-apply or upstream what you need:"
+      printf '      diff -r %s/raememberit/engine.prev %s/raememberit/engine\n' "$TARGET" "$TARGET"
+    else
+      run rm -rf "$TARGET/raememberit/engine.prev"
+    fi
+  fi
   run rm -rf "$TARGET/raememberit/engine"
   run cp -R "$SRC/engine" "$TARGET/raememberit/engine"
   run cp "$SRC/tools/check-filled.sh" "$TARGET/raememberit/"
+  [ "$DRY" = 1 ] || engine_manifest "$TARGET/raememberit/engine" > "$EMAN"
   ok "engine/ installed (hooks resolve via \${CLAUDE_CONFIG_DIR:-\$HOME/.claude})"
 fi
 
