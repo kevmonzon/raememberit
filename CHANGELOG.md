@@ -8,6 +8,18 @@ here, because a changelog written after the fact from subject lines is a guess w
 
 ## Unreleased
 
+### Retrieval no longer depends on remembering to retrieve
+
+A new `UserPromptSubmit` hook, `context-router.sh`, scores every prompt — its tokens, the working
+directory's name, any ticket key — against the catalog, the domain index, and the `description:` of
+every installed command and skill, and surfaces the best few of each. No model call. **Both halves
+default to `shadow`**: they log what they would have surfaced to `memory/.recall-log` and
+`memory/.skill-log` and inject nothing, so precision can be measured before a single byte is added
+to a prompt. `/recall` now writes the same log, and `/memory-audit` gained a retrieval-usage stage
+that reads it: an archive shortlist of memories nobody has retrieved, and the precision sample that
+justifies flipping the router to `inject`. Knobs: `RAEMEMBERIT_AUTORECALL`, `RAEMEMBERIT_SKILLROUTER`,
+`RAEMEMBERIT_AUTORECALL_BUDGET`, `RAEMEMBERIT_ROUTER_MAX`.
+
 ### Memories can name their domain, and the second silo is in the catalog
 
 `metadata.domain:` — a repo, tool or ticket prefix, kebab-case, comma-separated — is accepted on

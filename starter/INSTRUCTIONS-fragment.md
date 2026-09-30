@@ -43,6 +43,7 @@ duplicate gate, so a bad memory is refused rather than quietly stored.
 | When | What |
 |---|---|
 | Every new context | the always-on index is injected once, then suppressed until the context resets |
+| Every prompt | the context router scores the prompt against the catalog and the installed skills; in `shadow` mode (default) it only logs what it would surface, in `inject` mode it adds the best few lines to context |
 | Session start | if enough new interaction logs have accumulated, a pattern sweep is *offered* — never run automatically |
 | Before compaction | a reminder to capture durable memory first |
 | Session end | both indexes are regenerated from frontmatter |

@@ -74,6 +74,60 @@ grep -q -- '- \[-Users-x-other/MEMORY\](.*) — Memory Index' "$MEM/MEMORY-CATAL
 ! grep -q 'colima-cert' "$MEM/MEMORY.md" && ok "native memories stay out of the always-on tier" || bad "native memory leaked into MEMORY.md"
 [ "$(find "$CFG/projects" -name '*.md' | wc -l | tr -d ' ')" = 2 ] && ok "the silo was read, not written" || bad "the silo changed"
 
+echo "=== the context router: prompt → memories and skills, shadow by default ==="
+ROUTER="$ROOT/engine/hooks/context-router.sh"
+# Fixtures: a corpus (built above), two commands and one skill in the config dir.
+mkdir -p "$CFG/commands" "$CFG/skills/release-notes"
+printf -- '---\nname: deploy-checklist\ndescription: Use when deploying the billing service to staging — the runbook steps that are easy to skip\n---\nbody\n' > "$CFG/commands/deploy-checklist.md"
+printf -- '---\nname: unrelated-thing\ndescription: Use when carving pumpkins for a seasonal office decoration contest\n---\nbody\n' > "$CFG/commands/unrelated-thing.md"
+printf -- '---\nname: release-notes\ndescription: Use when writing release notes for the billing service from merged pull requests\n---\nbody\n' > "$CFG/skills/release-notes/SKILL.md"
+mem reference pay-123-outage "PAY-123 was the outage where the payments queue stalled after a deploy to staging"
+RAEMEMBERIT_MEMORY_DIR="$MEM" bash "$REBUILD" >/dev/null 2>&1
+rm -f "$MEM/.recall-log" "$MEM/.skill-log"
+route() {  # sid prompt cwd [env...]  -> stdout
+  local sid="$1" prompt="$2" cwd="$3"; shift 3
+  printf '{"session_id":"%s","prompt":%s,"cwd":"%s"}' "$sid" "$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$prompt")" "$cwd" \
+    | env RAEMEMBERIT_MEMORY_DIR="$MEM" CLAUDE_CONFIG_DIR="$CFG" "$@" bash "$ROUTER" 2>/dev/null
+}
+rm -f "${TMPDIR:-/tmp}"/raememberit-surfaced-ctx*
+out=$(route ctx1 "the billing node upgrade is failing when deploying to staging, help me" "/x/somewhere")
+[ -z "$out" ] && ok "shadow mode injects nothing" || bad "shadow mode produced output" "$out"
+grep -q 'auto-shadow' "$MEM/.recall-log" 2>/dev/null && ok "shadow mode logs the memories it would have surfaced" || bad "no recall log line in shadow mode"
+grep -q 'project/billing-node-upgrade.md' "$MEM/.recall-log" && ok "the matching memory is the one logged" || bad "wrong memory logged" "$(cat "$MEM/.recall-log")"
+! grep -q 'untagged-fact' "$MEM/.recall-log" && ok "an unrelated memory is not surfaced" || bad "an unrelated memory was surfaced"
+grep -q 'deploy-checklist' "$MEM/.skill-log" 2>/dev/null && ok "the matching command is logged as a skill candidate" || bad "no skill log line" "$(cat "$MEM/.skill-log" 2>/dev/null)"
+! grep -q 'unrelated-thing' "$MEM/.skill-log" && ok "an unrelated command is not a candidate" || bad "unrelated command surfaced"
+[ -f "$MEM/.skill-index" ] && grep -q 'release-notes	skill	' "$MEM/.skill-index" && ok "the skill index covers skills dirs as well as commands" || bad "skill index missing or incomplete"
+
+out=$(route ctx2 "the billing node upgrade is failing when deploying to staging, help me" "/x/somewhere" RAEMEMBERIT_AUTORECALL=inject RAEMEMBERIT_SKILLROUTER=inject)
+printf '%s' "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "additionalContext" in d["hookSpecificOutput"]' 2>/dev/null \
+  && ok "inject mode emits valid hook JSON" || bad "inject mode output is not valid hook JSON" "$out"
+printf '%s' "$out" | grep -q 'billing-node-upgrade' && ok "the injected block names the memory" || bad "memory missing from injected block"
+printf '%s' "$out" | grep -q 'project/billing-node-upgrade.md' && ok "and its path, so the file can be read" || bad "path missing"
+printf '%s' "$out" | grep -q '/deploy-checklist' && ok "the injected block names the skill" || bad "skill missing from injected block"
+printf '%s' "$out" | grep -q 'auto-inject' && bad "log mode leaked into output" || ok "and the log records inject mode: $(grep -c 'auto-inject' "$MEM/.recall-log") line(s)"
+out2=$(route ctx2 "the billing node upgrade is failing when deploying to staging, help me" "/x/somewhere" RAEMEMBERIT_AUTORECALL=inject RAEMEMBERIT_SKILLROUTER=inject)
+[ -z "$out2" ] && ok "the same hits are not surfaced twice in one session" || bad "repeated the same hits in one session" "$out2"
+
+out=$(route ctx3 "please look at what happened with PAY-123 last week" "/x/somewhere" RAEMEMBERIT_AUTORECALL=inject)
+printf '%s' "$out" | grep -q 'pay-123-outage' && ok "a ticket key alone routes to the memory that names it" || bad "ticket key did not route" "$out"
+out=$(route ctx4 "why does this handler keep timing out under load in production" "/x/code/payments" RAEMEMBERIT_AUTORECALL=inject)
+printf '%s' "$out" | grep -q 'payments-sysparams' && ok "the working directory's name routes through the domain index" || bad "cwd domain did not route" "$out"
+out=$(route ctx5 "/recall billing node" "/x/code/payments" RAEMEMBERIT_AUTORECALL=inject RAEMEMBERIT_SKILLROUTER=inject)
+[ -z "$out" ] && ok "a slash command is left alone" || bad "routed a slash command" "$out"
+n_before=$(wc -l < "$MEM/.recall-log" | tr -d ' ')
+out=$(route ctx6 "the billing node upgrade is failing when deploying to staging, help me" "/x/somewhere" RAEMEMBERIT_AUTORECALL=off RAEMEMBERIT_SKILLROUTER=off)
+[ -z "$out" ] && [ "$(wc -l < "$MEM/.recall-log" | tr -d ' ')" = "$n_before" ] && ok "off mode neither injects nor logs" || bad "off mode did something"
+out=$(route ctx7 "the billing node upgrade is failing when deploying to staging, help me" "/x/somewhere" RAEMEMBERIT_AUTORECALL=inject RAEMEMBERIT_AUTORECALL_BUDGET=60)
+printf '%s' "$out" | grep -q 'billing-node-upgrade' && bad "a 60-byte budget still admitted a 100-byte line" || ok "the byte budget is respected"
+out=$(printf 'not json at all' | env RAEMEMBERIT_MEMORY_DIR="$MEM" CLAUDE_CONFIG_DIR="$CFG" bash "$ROUTER" 2>&1); rc=$?
+[ "$rc" = 0 ] && [ -z "$out" ] && ok "malformed stdin exits 0 silently — a hook must never break a prompt" || bad "malformed stdin: rc=$rc out=$out"
+# The skill index is rebuilt when a command appears after it was built.
+sleep 1; printf -- '---\nname: pumpkin-carving\ndescription: Use when the billing service deploy to staging needs a pumpkin for luck\n---\nbody\n' > "$CFG/commands/pumpkin-carving.md"
+route ctx8 "deploying the billing service to staging again" "/x" >/dev/null
+grep -q 'pumpkin-carving' "$MEM/.skill-index" && ok "a new command is picked up by the next prompt" || bad "skill index went stale"
+rm -f "${TMPDIR:-/tmp}"/raememberit-surfaced-ctx*
+
 echo "─────"
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

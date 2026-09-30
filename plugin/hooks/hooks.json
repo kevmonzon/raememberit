@@ -30,6 +30,11 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/engine/hooks/inject-memory.sh",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/engine/hooks/context-router.sh",
+            "timeout": 5
           }
         ]
       }

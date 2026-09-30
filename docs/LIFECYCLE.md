@@ -126,6 +126,12 @@ the command files because a plugin's commands are managed files replaced on ever
 across the 39 official plugins no command reads a `CLAUDE_PLUGIN_OPTION_*`. Options reach
 processes; the hook is a process.
 
+`context-router.sh` fires on the same event, every prompt. It scores the prompt's tokens, the working
+directory's name and any ticket key against the catalog, the domain index and every installed
+command's or skill's `description:`, and surfaces the best few — in `shadow` mode (the default) by
+logging them to `.recall-log` and `.skill-log` only, in `inject` mode by adding them to the prompt's
+context under a byte budget. Once per hit per session, guarded like the injection is.
+
 What gets injected is only the **always-on tier**:
 
 | Tier | File | Contents |
@@ -342,6 +348,10 @@ inspect first.
 | `<corpus>/.seeded-starters` | `install.sh` | never | which starter rules this corpus ever received, so a `--force` top-up never re-adds one you deleted |
 | `raememberit/shipped/<name>` | `install.sh` on a skip | you | recovering a shipped command you chose not to take |
 | `$CLAUDE_PLUGIN_DATA/bin/mem-write.sh` | `place-shim.sh` | plugin removal | a version-free path for the permission rule |
+| `${TMPDIR}/raememberit-surfaced-<sid>` | `context-router.py` | session end (temp dir) | one surfacing per memory or skill per session |
+| `<corpus>/.recall-log` | `/recall`, `context-router.py` | never (append-only) | which memories are ever retrieved — the audit's archive shortlist and the router's precision sample |
+| `<corpus>/.skill-log` | `context-router.py` | never (append-only) | which skills the router matched, for the same precision sample |
+| `<corpus>/.skill-index` | `context-router.py` | rebuilt when a command or skill is newer | name, kind, path, description of every installed command and skill |
 | `<corpus>/.domain-index` | `rebuild-index.sh` | next rebuild | domain → memory rows, read by the prompt-time context router |
 | `<corpus>/.index-status` | `rebuild-index.sh` | next rebuild | the always-on budget verdict, `OK`/`OVER`, surfaced by the tripwire |
 | `<corpus>/.index-rebuild.log` | `rebuild-index-hook.sh` | next rebuild | the rebuild's own output, which used to go to `/dev/null` |

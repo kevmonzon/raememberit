@@ -148,7 +148,33 @@ The count only becomes a true signal once the deliberate globals carry `scope: g
 until then it is an upper bound, not a measurement. Labelling them is a one-line-per-file change and
 turns the ambiguity into the one number in this audit that predicts rather than reports.
 
-## 7. The eval harness — the number that closes the audit
+## 7. Retrieval usage — what is ever looked at, and what the router would have surfaced
+
+`$MEM/.recall-log` records every sweep: `/recall` writes one line per lookup, and the prompt-time
+router writes one per prompt it matched, in `auto-shadow` or `auto-inject` mode. `$MEM/.skill-log`
+is the same for skill candidates. Both are tab-separated: timestamp, source, session, query tokens,
+hits.
+
+```bash
+wc -l "$MEM/.recall-log" "$MEM/.skill-log" 2>/dev/null
+head -1 "$MEM/.recall-log"                                    # how far back the record reaches
+# memories never retrieved in the window the log covers — an ARCHIVE shortlist, not a verdict
+for f in "$MEM"/project/*.md "$MEM"/reference/*.md; do
+  rel="${f#$MEM/}"; grep -q "$rel" "$MEM/.recall-log" 2>/dev/null || echo "never retrieved: $rel"
+done | head -40
+```
+
+Read the shortlist against the log's **age**: a memory unretrieved in a three-day-old log means
+nothing; one unretrieved across ninety days of real use is a candidate for `archive/`. Report the
+window with the count.
+
+**Router precision, while the router is in shadow mode.** Sample twenty `auto-shadow` lines and judge
+each hit: would the memory or skill have helped that prompt? Report hits, misses and the ratio. That
+ratio is the evidence for flipping `RAEMEMBERIT_AUTORECALL` or `RAEMEMBERIT_SKILLROUTER` to `inject`,
+and the only honest one — a hook that injects before its precision is measured is the always-on tier
+growing by another door.
+
+## 8. The eval harness — the number that closes the audit
 
 ```bash
 python3 engine/eval/run_eval.py
@@ -158,7 +184,7 @@ python3 engine/eval/run_eval.py --health
 Compare against the frozen baseline in `eval/`. **Never edit an expectation to turn a run green.**
 If a fix is applied later, re-run and report the delta — that is the only evidence it helped.
 
-## 8. Report
+## 9. Report
 
 One table: finding · evidence (count/path) · impact · proposed fix · reversible? Then **stop**.
 

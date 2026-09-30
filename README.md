@@ -39,6 +39,7 @@ the file.
 | `SessionStart` | _(all)_ | `skillmine-nag.sh` | 5s |
 | `SessionStart` | _(all)_ | `truncation-tripwire.sh` | 5s |
 | `UserPromptSubmit` | _(all)_ | `inject-memory.sh` | 5s |
+| `UserPromptSubmit` | _(all)_ | `context-router.sh` | 5s |
 | `PreCompact` | `auto` | `precompact-notice.sh` | 5s |
 | `PostCompact` | _(all)_ | `rearm-inject.sh` | 5s |
 | `Stop` | _(all)_ | `require-log.sh` | 5s |
@@ -66,6 +67,10 @@ keeps writing the default corpus even when the session is pointed elsewhere.
 | `RAEMEMBERIT_TRIPWIRE_WINDOW_H` | `48` | how far back the tripwire looks for truncated injections; also how long a warning takes to clear itself |
 | `RAEMEMBERIT_QUERIES` | `<corpus>/eval/queries.json` | the query file the eval harness scores against |
 | `RAEMEMBERIT_DENYLIST` | `.denylist.local.txt` | a private vocabulary file for the sanitization gate |
+| `RAEMEMBERIT_AUTORECALL` | `shadow` | the prompt-time router's memory half: `shadow` logs what it would surface to `memory/.recall-log` and injects nothing · `inject` adds the best few catalog lines to the prompt's context · `off` |
+| `RAEMEMBERIT_SKILLROUTER` | `shadow` | its skill half: `shadow` logs matching commands and skills to `memory/.skill-log` · `inject` names them in context · `off` |
+| `RAEMEMBERIT_AUTORECALL_BUDGET` | `1500` | byte ceiling for the injected memory block |
+| `RAEMEMBERIT_ROUTER_MAX` | `3` | entries per injected block |
 
 Three more variables exist but are **configuration, not knobs**: `RAEMEMBERIT_USER`,
 `RAEMEMBERIT_PERSONA_FILE` and `RAEMEMBERIT_VOCAB_FILE`. On the standalone route they are the
@@ -86,6 +91,21 @@ thing.
 the stop; that is a reasonable choice for its author and a hostile default for anyone else — a
 hook that refuses to let someone end their session is the fastest route to the kit being
 uninstalled.
+
+### The prompt-time router — retrieval that does not depend on remembering to retrieve
+
+`context-router.sh` runs on every prompt. It tokenizes the prompt, the working directory's name and
+any ticket key, scores them against every catalog line and the domain index, and against the
+`description:` of every installed command and skill, and surfaces the best few of each. No model
+call, tens of milliseconds, once per hit per session.
+
+**Both halves default to `shadow`**: they write what they *would* have surfaced to
+`memory/.recall-log` and `memory/.skill-log` and inject nothing. That is deliberate. Injection is the
+scarcest resource here, and a hook that injects before its precision is measured is the always-on tier
+growing by another door. Run it in shadow for a week, have `/memory-audit` sample the log, then flip
+to `inject` with the number in hand. `/recall` writes the same log for manual sweeps, so together they
+are the only record of which memories are ever read — the audit uses it to shortlist memories nobody
+has retrieved in months, which is how the corpus prunes itself instead of only growing.
 
 ### Tiering the always-on index
 
@@ -330,7 +350,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-358 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+378 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

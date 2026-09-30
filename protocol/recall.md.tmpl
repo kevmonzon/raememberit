@@ -156,6 +156,16 @@ rather than reporting the checkout's value. Separate the **mechanism** (which st
 If nothing is found, say so explicitly — "no prior memory on X". That is a useful result, and it
 stops the next session from searching again.
 
+### 6. Record the sweep — one line, so the corpus can learn what gets used
+
+```bash
+printf '%s\tmanual\t-\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "<topic>" "<comma-separated paths you read, or ->" >> "$MEM/.recall-log"
+```
+
+The prompt-time router writes the same log for what it surfaces unasked. Together they are the only
+record of which memories are ever retrieved — `/memory-audit` reads it to shortlist memories nobody
+has looked at in months, which is how the corpus prunes itself instead of only growing.
+
 ## Related
 
 - `/learn` — capture a single fact mid-task

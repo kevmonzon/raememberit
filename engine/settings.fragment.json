@@ -25,6 +25,11 @@
             "type": "command",
             "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/inject-memory.sh",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/raememberit/engine/hooks/context-router.sh",
+            "timeout": 5
           }
         ]
       }
