@@ -677,7 +677,13 @@ if [ "$PLUGINMODE" = 0 ] && [ "$HFP" = 0 ] && [ -f "$TARGET/skills/raememberit/h
   warn "                                drop the plugin, then re-run this"
   die  "refusing to create a doubled configuration. Pass --force to do it anyway."
 fi
-if [ "$DRY" = 1 ]; then printf '  would: merge hook wiring into %s/settings.json\n' "$TARGET"; else
+if [ "$DRY" = 1 ]; then
+  if [ "$PLUGINMODE" = 1 ] || [ "$HFP" = 1 ]; then
+    printf '  would: leave the hooks to the plugin — removing any raememberit hook groups from %s/settings.json\n' "$TARGET"
+  else
+    printf '  would: merge hook wiring into %s/settings.json\n' "$TARGET"
+  fi
+else
 python3 - "$SRC/engine/settings.fragment.json" "$TARGET/settings.json" "$MEM" "$PLUGINMODE" "$SHIM" "$HFP" <<'PY'
 import json, os, sys
 frag_p, set_p, mem = sys.argv[1], sys.argv[2], sys.argv[3]

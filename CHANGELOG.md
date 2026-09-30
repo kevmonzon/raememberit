@@ -8,6 +8,17 @@ here, because a changelog written after the fact from subject lines is a guess w
 
 ## Unreleased
 
+### Smaller things found by the same audit
+
+- **`--hooks-from-plugin` is now the recommended route.** It is the one the kit's author runs, the
+  only one exercised daily, and the one with the fewest moving parts on upgrade. The other two stay
+  supported and tested.
+- **`uninstall.sh` stripped any permission rule containing `/memory/**`**, which is a shape, not an
+  identity — a user's own rule on some other memory directory would have gone with it. It now removes
+  only rules naming raememberit and the one `Read()` rule aimed at this corpus.
+- **`--dry-run` on the plugin routes claimed it would "merge hook wiring"** while the real run removes
+  raememberit's hook groups from settings and leaves the hooks to the plugin. It now says what it does.
+
 ### A local patch to the installed engine vanished silently on upgrade
 
 Documented as "a knob, not an edit", and it still happened: the truncation tripwire lived as a

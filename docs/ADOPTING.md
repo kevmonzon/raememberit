@@ -23,13 +23,16 @@ Fifteen minutes to install and try. Then use Claude Code as you normally would, 
 
 This is a real path, not an afterthought — it is the case the author's own setup proved matters.
 
-`install.sh` is for exactly this: it brings the engine and hooks and leaves your commands alone. If you
-already have memory hooks of your own, guided mode **detects and names them** rather than quietly
-running both, because two mechanisms doing the same job is the failure mode you will not notice until
-your index is written twice.
+`install.sh --hooks-from-plugin` is the recommended route, for a customized setup and a fresh one
+alike: it brings the engine and the commands, leaves any command you have edited alone, and supplies
+the hooks through a small generated plugin so nothing lands in `settings.json`. If you already have
+memory hooks of your own, guided mode **detects and names them** rather than quietly running both,
+because two mechanisms doing the same job is the failure mode you will not notice until your index is
+written twice.
 
-The plugin is the other route, and it is the easier one if you have nothing to preserve. Its commands
-are managed files, so it cannot carry commands you have edited. Pick by whether you have any.
+`--as-plugin` is the other route, for someone with nothing to preserve who wants everything inside one
+plugin directory. Its commands are managed files, so it cannot carry commands you have edited. Either
+way, `./install.sh --check` tells you whether an install is current and prints the exact re-run.
 
 ## Known rough edges
 
@@ -40,8 +43,9 @@ Stated up front so none of them is a surprise:
   stays one portable unit, and Claude Code refuses its edit tools on paths inside a `.claude`
   directory as sensitive — no permission rule changes that. Bash is not gated, so
   `engine/mem-write.sh` is the write path. It also validates the schema, which the edit tool could not.
-- **Updates are manual on the standalone path** — `git pull && ./install.sh`. Re-running is safe and
-  never touches memories. The plugin updates itself.
+- **Updates are manual** — `git pull && ./install.sh --check`, then the re-run it prints. Re-running is
+  safe and never touches memories; anything you patched in the engine is named and kept aside rather
+  than lost.
 - **The always-on index grows.** Every `feedback/` rule is injected into every context forever. In the
   setup this came from it grew about 10% a week, and once by 10% in a single afternoon. Watch it, and
   retire rules — adding is the easy half.

@@ -352,6 +352,11 @@ ckt "quiet when the fragment itself was pasted"             "grep -q 'already in
 rm -rf "$F" "$F.log1" "$F.log2" "$F.log3" "$F.log4"
 
 echo "=== UNINSTALL leaves their setup as it was, and keeps their memories ==="
+# Their own rule on some OTHER memory directory must survive: the stripping used to match any rule
+# containing "/memory/**", which is a shape, not an identity.
+python3 - "$T/settings.json" <<'PYR'
+import json,sys; p=sys.argv[1]; d=json.load(open(p)); d.setdefault("permissions",{}).setdefault("allow",[]).append("Read(/elsewhere/memory/**)"); json.dump(d,open(p,"w"),indent=2)
+PYR
 "$ROOT/uninstall.sh" --config-dir "$T" >"$T/unlog" 2>&1
 ck  "uninstall exited 0" "$?" "0"
 ck  "commands removed"   "$(ls "$T/commands" 2>/dev/null | wc -l | tr -d ' ')" "0"
@@ -360,6 +365,8 @@ ckt "their own hook survived uninstall" "grep -q 'their-own-hook' '$T/settings.j
 ckt "their theme survived uninstall"    "grep -q '\"dark\"' '$T/settings.json'"
 ckt "no leftover hook entries"          "! grep -q '/raememberit/engine/hooks/' '$T/settings.json'"
 ckt "no leftover permission rules"      "! grep -q 'raememberit' '$T/settings.json'"
+ckt "our Read() rule on the corpus is gone" "! grep -q \"Read($MEM/\*\*)\" '$T/settings.json'"
+ckt "their own rule on another memory dir survives" "grep -q 'Read(/elsewhere/memory/' '$T/settings.json'"
 ckt "the corpus directory itself survives" "[ -d '$MEM/feedback' ]"
 ckt "MEMORIES KEPT by default"          "[ -f '$MEM/feedback/their-own-rule.md' ]"
 ckt "uninstall said so"                 "grep -qi 'KEPT' '$T/unlog'"

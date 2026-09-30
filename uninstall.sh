@@ -78,9 +78,9 @@ fi
 
 say "Settings"
 if [ -f "$TARGET/settings.json" ] && [ "$DRY" = 0 ]; then
-python3 - "$TARGET/settings.json" <<'PY'
+python3 - "$TARGET/settings.json" "$MEM" <<'PY'
 import json, sys
-p = sys.argv[1]; d = json.load(open(p))
+p = sys.argv[1]; d = json.load(open(p)); mem = sys.argv[2]
 MARK = "/raememberit/engine/hooks/"
 hooks = d.get("hooks", {}); removed = 0
 for ev in list(hooks):
@@ -94,7 +94,10 @@ perm = d.get("permissions", {}); rules = 0
 for k in ("allow", "deny", "ask"):
     if k in perm:
         before = len(perm[k])
-        perm[k] = [r for r in perm[k] if "raememberit" not in r and "/memory/**" not in r]
+        # Only OUR rules: anything naming raememberit, and the one Read() rule aimed at THIS corpus.
+        # `"/memory/**" not in r` used to go too, which would have taken a user's own rule on some
+        # other memory directory with it.
+        perm[k] = [r for r in perm[k] if "raememberit" not in r and r != f"Read({mem}/**)"]
         rules += before - len(perm[k])
         if not perm[k]: del perm[k]
 if not perm: d.pop("permissions", None)

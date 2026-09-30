@@ -546,6 +546,13 @@ sys.exit(0 if any("/raememberit/engine/mem-write.sh" in r for r in a) else 1)' \
   || bad "the rule does not name the config-dir engine"
 [ -d "$th/commands" ] && ok "commands are installed (unlike --as-plugin)" || bad "no commands installed"
 
+# --dry-run on this route must describe what the real run does — it removes hook groups, it does not merge.
+outd="$(bash install.sh --hooks-from-plugin --config-dir "$th" --no-guided --dry-run 2>&1)"
+printf '%s' "$outd" | grep -q 'leave the hooks to the plugin' \
+  && ok "--dry-run says the hooks stay with the plugin" || bad "--dry-run still claims it would merge hook wiring"
+printf '%s' "$outd" | grep -q 'would: merge hook wiring' \
+  && bad "--dry-run claims a merge that the real run does not perform" || ok "and does not claim a merge"
+
 # Migration: a config wired standalone must have its settings hooks stripped, not doubled.
 bash install.sh --config-dir "$th" --no-guided --force >/dev/null 2>&1
 n_before=$(python3 -c 'import json;d=json.load(open("'"$th"'/settings.json"));print(sum(len(v) for v in d.get("hooks",{}).values()))')

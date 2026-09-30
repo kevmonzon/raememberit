@@ -145,11 +145,18 @@ memory hooks you already have instead of quietly running both. See `docs/ADOPTIN
 
 | | For | Where the engine lives | Where the hooks come from |
 |---|---|---|---|
-| **`./install.sh --as-plugin`** | starting fresh | inside the plugin | the plugin |
-| **`./install.sh`** | adopting into a customized setup | `<config>/raememberit/engine/` | `settings.json` |
-| **`./install.sh --hooks-from-plugin`** | a customized setup that would rather not carry hook entries in settings | `<config>/raememberit/engine/` | a small generated plugin |
+| **`./install.sh --hooks-from-plugin`** — *recommended* | any setup, customized or not | `<config>/raememberit/engine/` | a small generated plugin |
+| `./install.sh --as-plugin` | starting fresh, nothing to preserve | inside the plugin | the plugin |
+| `./install.sh` | a setup that wants its hook entries visible in `settings.json` | `<config>/raememberit/engine/` | `settings.json` |
 
-The third row is not a variant for its own sake. **Hand-edited commands hardcode the config-dir engine
+**The first row is the recommended one.** It is the arrangement the kit's own author runs, the only one
+exercised daily, and the one whose upgrade path has the fewest moving parts: the engine never moves, so
+every command reference stays valid; the hooks live in a generated plugin, so `settings.json` carries
+none of them and nothing can double; and an upgrade regenerates that plugin from the fragment rather
+than replacing a directory you might have touched. The other two work and are tested, but each adds an
+update path to keep safe, and three of those is how the defects fixed in `0.6.0` went unnoticed.
+
+The first row is not a variant for its own sake. **Hand-edited commands hardcode the config-dir engine
 paths**, so any route that moves the engine breaks them *silently* — they grep nothing and report a
 confident absence. That mode keeps the engine still while moving only the hooks, and the plugin it
 generates needs no path rewriting at all: the settings fragment's commands already point exactly where
@@ -306,7 +313,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-335 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+339 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone
