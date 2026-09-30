@@ -33,6 +33,9 @@ cp -R starter plugin/starter
 cp -R scaffold plugin/scaffold
 cp install.sh plugin/install.sh
 chmod +x plugin/install.sh 2>/dev/null || true
+# The front door too: /raememberit:setup drives it, and it detects the plugin tree it sits in.
+cp raememberit plugin/raememberit
+chmod +x plugin/raememberit 2>/dev/null || true
 
 # --- 1c. commands ------------------------------------------------------------------------------
 # The standalone installer RENDERS the templates at install time. A plugin cannot: its files are

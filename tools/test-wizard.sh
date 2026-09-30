@@ -121,6 +121,26 @@ printf 'delete my memories\n' | bash "$WIZ" uninstall --yes --and-my-memories --
 bash "$WIZ" uninstall --yes --config-dir "$T" >"$W/o10" 2>&1
 grep -q 'nothing to remove' "$W/o10" && ok "uninstalling twice is harmless" || bad "second uninstall misbehaved" "$(cat "$W/o10")"
 
+echo "=== from inside the plugin tree, the same front door, plugin mechanics ==="
+# /raememberit:setup runs plugin/raememberit. The engine is the plugin's own, the corpus is seeded
+# outside it, and no hooks are wired into settings (the plugin supplies them).
+TP="$W/plug/.claude"; mkdir -p "$TP/plugins/data/raememberit-skills-dir/bin"
+printf '#!/usr/bin/env bash\nexec bash /nowhere/mem-write.sh "$@"\n' > "$TP/plugins/data/raememberit-skills-dir/bin/mem-write.sh"
+bash "$ROOT/plugin/raememberit" status --config-dir "$TP" >"$W/p0" 2>&1; rc=$?
+[ "$rc" = 1 ] && grep -q 'not installed' "$W/p0" && ok "plugin: status before setup says not installed" || bad "plugin status before setup: rc=$rc" "$(cat "$W/p0")"
+bash "$ROOT/plugin/raememberit" install --config-dir "$TP" --yes --skip-note --name Pat >"$W/p1" 2>&1; rc=$?
+[ "$rc" = 0 ] && ok "plugin: install finishes" || bad "plugin install rc=$rc" "$(tail -8 "$W/p1")"
+[ -d "$TP/memory/feedback" ] && ok "plugin: corpus seeded outside the plugin" || bad "plugin: no corpus"
+[ ! -d "$TP/raememberit" ] && ok "plugin: no engine copied into the config dir" || bad "plugin: engine was copied"
+python3 -c 'import json,sys; d=json.load(open("'"$TP"'/settings.json")); sys.exit(0 if not d.get("hooks") else 1)' \
+  && ok "plugin: no hooks wired into settings" || bad "plugin: hooks wired into settings"
+! grep -q 'raememberit:begin' "$TP/CLAUDE.md" 2>/dev/null && ok "plugin: --skip-note leaves CLAUDE.md to the setup command" || bad "--skip-note ignored"
+grep -q 'tools installed' "$W/p1" && ok "plugin: same plain summary" || bad "plugin: summary missing"
+no_jargon "plugin install" "$W/p1"
+bash "$ROOT/plugin/raememberit" status --config-dir "$TP" >"$W/p2" 2>&1; rc=$?
+[ "$rc" = 0 ] && grep -q 'up to date' "$W/p2" && ok "plugin: status after setup is up to date" || bad "plugin status after setup: rc=$rc" "$(cat "$W/p2")"
+rm -rf "$W/plug"
+
 echo "=== --advanced hands everything to the old scripts unchanged ==="
 bash "$WIZ" install --advanced --help >"$W/o11" 2>&1 && grep -q -- '--hooks-from-plugin' "$W/o11" && ok "install --advanced --help is install.sh's help" || bad "--advanced did not reach install.sh"
 bash "$WIZ" uninstall --advanced --help >"$W/o12" 2>&1 && grep -q -- '--purge' "$W/o12" && ok "uninstall --advanced --help is uninstall.sh's help" || bad "--advanced did not reach uninstall.sh"

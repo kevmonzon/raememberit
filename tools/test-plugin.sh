@@ -205,7 +205,7 @@ fi
 rm -f "$guard"
 
 echo "== the plugin is self-sufficient =="
-for f in install.sh engine/mem-write.sh engine/rebuild-index.sh starter/queries.json scaffold/memory/README.md commands/setup.md; do
+for f in install.sh raememberit engine/mem-write.sh engine/rebuild-index.sh starter/queries.json scaffold/memory/README.md commands/setup.md; do
   [ -e "plugin/$f" ] && ok "ships $f" || bad "does not ship $f, which setup needs"
 done
 # It must NOT ship the standalone wiring fragment, and must not need it. Shipping it would invite

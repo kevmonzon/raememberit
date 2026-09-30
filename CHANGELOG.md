@@ -26,6 +26,10 @@ memories in the person's own words, and removed exactly — nothing else — on 
 explanation now has its `<config>` placeholder rendered to the real directory, so the import reads
 true paths.
 
+The plugin ships the same front door, which detects the tree it sits in and switches to the plugin
+mechanics without the person seeing a difference; `/raememberit:setup` now drives it. The README
+opens with three commands, and the routes and flags moved, unchanged, to `docs/ADVANCED.md`.
+
 ## 0.6.0
 
 An audit of the update path, and the first hooks that make retrieval and learning involuntary

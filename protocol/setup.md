@@ -7,10 +7,11 @@ description: Set up raememberit — detect what is already here, seed the corpus
 You are onboarding someone who has just installed this plugin. **They have not read any
 documentation, and they should not need to.** This command is the installer.
 
-`install.sh --plugin` does the file changes. Your job is the part a script cannot do: explain what is
-about to change before it changes, in their situation rather than in general, and stop when a step
-needs a decision. Work through the steps in order. **Do not batch them into one message** — each one
-that changes something gets its own confirmation.
+`raememberit` — the front door script shipped in this plugin — does the file changes and already
+speaks plainly. Your job is the part a script cannot do: explain what is about to change before it
+changes, in their situation rather than in general, and stop when a step needs a decision. Work
+through the steps in order. **Do not batch them into one message** — each one that changes something
+gets its own confirmation.
 
 Throughout: `PLUGIN="${CLAUDE_PLUGIN_ROOT}"`, and the config dir is
 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`. If `CLAUDE_PLUGIN_ROOT` is not set in a shell you run, find the
@@ -22,8 +23,12 @@ component and guessing it is how this breaks after an update.
 Run the installer in **dry-run** mode and read its output. It changes nothing:
 
 ```bash
+bash "$PLUGIN/raememberit" status
 bash "$PLUGIN/install.sh" --plugin --dry-run --no-guided
 ```
+
+The first says, in plain words, whether anything is already set up; the second lists every file the
+real run would touch.
 
 Then tell them, in plain sentences, which of these three situations they are in:
 
@@ -66,8 +71,11 @@ nothing else.
 Get a yes, then run it for real:
 
 ```bash
-bash "$PLUGIN/install.sh" --plugin --no-guided --user "<their name, or omit>"
+bash "$PLUGIN/raememberit" install --yes --skip-note --name "<their name, or omit --name>"
 ```
+
+`--skip-note` because step 4 is yours: the front door would otherwise offer the `CLAUDE.md` note
+itself, and it should be offered by you, in their situation.
 
 This also seeds the corpus if absent (scaffold plus 11 starter rules), writes the instruction
 fragment, and rebuilds the indexes. It never wires hooks — the plugin already supplies those, and
@@ -119,7 +127,8 @@ scrutiny than notes.
 ## 7. How to get out, before they need it
 
 ```
-claude plugin uninstall raememberit
+claude plugin uninstall raememberit          # a marketplace install
+bash "$PLUGIN/raememberit" uninstall         # a copy placed by hand
 ```
 
 Their **memories are not in the plugin** — they are at `<config>/memory`, and uninstalling cannot

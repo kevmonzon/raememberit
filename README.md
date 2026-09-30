@@ -250,7 +250,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-450 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+460 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone
