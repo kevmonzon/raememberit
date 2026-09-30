@@ -319,9 +319,45 @@ do_uninstall() {
   printf '\n'; rm -f "$log"
 }
 
-# ── the note in CLAUDE.md (filled in by the next step) ─────────────────────────────
-claude_md_step()   { :; }
-claude_md_remove() { :; }
+# ── the note in CLAUDE.md ───────────────────────────────────────────────────────────
+# Without something in a CLAUDE.md, every reminder fires, every memory is saved, and Claude is never
+# told any of it exists — seven green steps and a no-op. So the front door offers to add a short
+# note, between markers it can find again, that IMPORTS the longer explanation with an `@` line
+# rather than pasting sixty lines into someone's file. If the file already speaks of memories in the
+# person's own words, it is left alone. If it does not exist, it is created. Uninstall removes
+# exactly the marked block and nothing else.
+BEGIN_MARK='<!-- raememberit:begin — added by ./raememberit install, removed by ./raememberit uninstall -->'
+END_MARK='<!-- raememberit:end -->'
+fragment_path() { if [ "$PLUGIN" = 1 ]; then printf '%s' "$MEM/INSTRUCTIONS-fragment.md"; else printf '%s' "$TARGET/raememberit/INSTRUCTIONS-fragment.md"; fi; }
+claude_md_step() {
+  local c; c="$(claude_md)"
+  if claude_md_instructs; then good "$(tilde "$c") already tells Claude about memories — left alone"; return 0; fi
+  local frag; frag="$(fragment_path)"
+  say "These are the lines I would add to $(tilde "$c")$([ -f "$c" ] || printf ' (creating it — it does not exist yet)'):"
+  printf '  ┌──────────────────────────────────────────────────────────────────────\n'
+  printf '  │ %s\n' "$BEGIN_MARK" "## Memory" "@$frag" "$END_MARK"
+  printf '  └──────────────────────────────────────────────────────────────────────\n'
+  line "The @ line points Claude at the longer explanation, kept here:"
+  line "  $(tilde "$frag")"
+  if ask_yn "Add them?" y; then
+    { [ -f "$c" ] && [ -s "$c" ] && printf '\n'; printf '%s\n' "$BEGIN_MARK" "## Memory" "@$frag" "$END_MARK"; } >> "$c"
+    good "added — Claude will now use memories on its own"
+  else
+    note "not added — Claude will use memories only when you type /recall or /learn yourself."
+    line "    To add it later:  ./raememberit update"
+  fi
+}
+claude_md_remove() {
+  local c; c="$(claude_md)"; [ -f "$c" ] || return 0
+  if grep -qF 'raememberit:begin' "$c"; then
+    awk -v b='raememberit:begin' -v e='raememberit:end' '
+      index($0,b){skip=1; next} index($0,e){skip=0; next} !skip{print}' "$c" > "$c.tmp" && mv "$c.tmp" "$c"
+    if [ -z "$(tr -d '[:space:]' < "$c")" ]; then rm -f "$c"; good "the note in $(tilde "$c") removed — the file held nothing else, so it is gone too"
+    else good "the note in $(tilde "$c") removed — the rest of the file is as it was"; fi
+  elif claude_md_instructs; then
+    note "$(tilde "$c") mentions memories in your own words — left alone"
+  fi
+}
 
 usage() {
   cat <<'EOF'

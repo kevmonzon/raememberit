@@ -19,6 +19,13 @@ nobody at the terminal takes every default and finishes. `install.sh` and `unins
 unchanged and reachable through `--advanced`. Uninstall keeps the memories unless
 `--and-my-memories` is given *and* the phrase "delete my memories" is typed.
 
+It also offers the one step nothing enforced: a four-line note in `CLAUDE.md`, between markers,
+whose `@` line imports the shipped explanation instead of pasting sixty lines into someone's file.
+Shown first, added on a yes, created if the file is missing, skipped if the file already speaks of
+memories in the person's own words, and removed exactly — nothing else — on uninstall. The shipped
+explanation now has its `<config>` placeholder rendered to the real directory, so the import reads
+true paths.
+
 ## 0.6.0
 
 An audit of the update path, and the first hooks that make retrieval and learning involuntary

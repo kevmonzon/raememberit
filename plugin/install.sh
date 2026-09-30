@@ -625,7 +625,9 @@ say "Instructions"
 # is replaced on update, so a file the user is meant to read and keep cannot live there.
 if [ "$PLUGINMODE" = 1 ]; then FRAG="$MEM/INSTRUCTIONS-fragment.md"; else FRAG="$TARGET/raememberit/INSTRUCTIONS-fragment.md"; fi
 if [ "$DRY" = 1 ]; then printf '  would: write %s\n' "$FRAG"; else
-  cp "$SRC/starter/INSTRUCTIONS-fragment.md" "$FRAG"
+  # <config> is rendered to the real directory: the front door imports this file into a CLAUDE.md
+  # with an @ line, and an imported placeholder would be read literally.
+  sed "s|<config>|$TARGET|g" "$SRC/starter/INSTRUCTIONS-fragment.md" > "$FRAG"
   if [ -n "$PERSONA" ]; then { printf '\n'; cat "$PERSONA"; } >> "$FRAG"; fi
 fi
 ok "fragment written — it is YOURS to paste into CLAUDE.md; nothing was written to your CLAUDE.md"

@@ -19,8 +19,8 @@ strip() { sed 's/\x1b\[[0-9;]*m//g'; }
 # Words a non-technical person should never meet on the happy path. Paths are exempt (a path is a
 # place, not a concept), so lines that are only a path are dropped before the check.
 JARGON='hook|corpus|plugin|manifest|json|scaffold|fragment|settings|permission|--force|--replace|--hooks-from|--as-plugin|CLAUDE_CONFIG_DIR|skills-dir|env |guided|addressee'
-no_jargon() {  # $1 label, $2 file
-  local hits; hits=$(strip < "$2" | grep -viE '^\s*(/|~)' | grep -iE "$JARGON" || true)
+no_jargon() {  # $1 label, $2 file  — lines that are a path, or the boxed note itself, are exempt
+  local hits; hits=$(strip < "$2" | grep -viE '^\s*(/|~|│|┌|└)' | grep -iE "$JARGON" || true)   # a path is a place, not a concept
   [ -z "$hits" ] && ok "$1: no jargon on the happy path" || bad "$1: jargon leaked" "$hits"
 }
 T="$W/.claude"; MEM="$T/memory"; WIZ="$ROOT/raememberit"
@@ -43,6 +43,30 @@ grep -q 'background reminders in place' "$W/o1" && ok "reminders are mentioned i
 grep -q '/recall tail exit code' "$W/o1" && ok "it ends with the two-minute try-it" || bad "no try-it"
 grep -q 'user=Casey' "$T/raememberit/.config" && ok "--name reaches the install" || bad "name not recorded"
 no_jargon "install" "$W/o1"
+
+echo "=== the note in CLAUDE.md ==="
+grep -q 'creating it' "$W/o1" && ok "it says the file will be created when it does not exist" || bad "no creation notice"
+[ -f "$T/CLAUDE.md" ] && ok "CLAUDE.md was created" || bad "CLAUDE.md not created"
+grep -q 'raememberit:begin' "$T/CLAUDE.md" && grep -q 'raememberit:end' "$T/CLAUDE.md" && ok "the note sits between markers" || bad "markers missing"
+IMP=$(sed -n 's/^@//p' "$T/CLAUDE.md" | head -1)
+[ -n "$IMP" ] && [ -f "$IMP" ] && ok "the @ line imports a file that exists" || bad "@ line points nowhere: $IMP"
+! grep -q '<config>' "$IMP" && ok "the imported explanation has real paths, not <config>" || bad "placeholder left in the fragment"
+grep -q "$T/raememberit/engine/mem-write.sh" "$IMP" && ok "and it names the real write helper path" || bad "fragment does not name the real helper path"
+grep -q 'added — Claude will now use memories' "$W/o1" && ok "the summary confirms the note" || bad "note not confirmed"
+# A CLAUDE.md that already speaks of memories in the person's own words is left alone.
+T2="$W/own/.claude"; mkdir -p "$T2"; printf '# Mine\n\nRun /recall before digging.\n' > "$T2/CLAUDE.md"
+bash "$WIZ" install --config-dir "$T2" --yes >"$W/own.log" 2>&1
+grep -q 'already tells Claude about memories' "$W/own.log" && ! grep -q 'raememberit:begin' "$T2/CLAUDE.md" \
+  && ok "own-words instructions are respected, nothing appended" || bad "appended to a CLAUDE.md that already instructs"
+# A CLAUDE.md about something else gets the note appended after its content, intact.
+T3="$W/other/.claude"; mkdir -p "$T3"; printf '# Project notes\n\nUse tabs.\n' > "$T3/CLAUDE.md"
+bash "$WIZ" install --config-dir "$T3" --yes >"$W/other.log" 2>&1
+head -1 "$T3/CLAUDE.md" | grep -q '# Project notes' && grep -q 'Use tabs.' "$T3/CLAUDE.md" && grep -q 'raememberit:begin' "$T3/CLAUDE.md" \
+  && ok "an unrelated CLAUDE.md keeps its content and gains the note" || bad "unrelated CLAUDE.md mishandled"
+bash "$WIZ" uninstall --config-dir "$T3" --yes >"$W/other-un.log" 2>&1
+! grep -q 'raememberit' "$T3/CLAUDE.md" && grep -q 'Use tabs.' "$T3/CLAUDE.md" && ok "uninstall removes exactly the note and keeps the rest" || bad "uninstall damaged CLAUDE.md" "$(cat "$T3/CLAUDE.md")"
+grep -q 'the rest of the file is as it was' "$W/other-un.log" && ok "and says so" || bad "uninstall silent about the note"
+rm -rf "$W/own" "$W/other"
 
 echo "=== status on a fresh, current install ==="
 bash "$WIZ" status --config-dir "$T" >"$W/o2" 2>&1; rc=$?
@@ -86,6 +110,7 @@ bash "$WIZ" uninstall --yes --config-dir "$T" >"$W/o7" 2>&1; rc=$?
 [ ! -d "$T/raememberit" ] && [ ! -d "$T/skills/raememberit" ] && ok "tools and reminders are gone" || bad "tools remain"
 [ "$(find "$MEM/feedback" -name '*.md' | wc -l | tr -d ' ')" = "$N" ] && ok "memories kept ($N)" || bad "memories touched"
 grep -q 'memories kept' "$W/o7" && grep -q 'delete my memories' "$W/o7" && ok "it says the memories stayed and how to delete them" || bad "uninstall summary wrong"
+[ ! -f "$T/CLAUDE.md" ] && grep -q 'held nothing else, so it is gone too' "$W/o7" && ok "a CLAUDE.md that held only our note is removed with it" || bad "empty CLAUDE.md left behind"
 no_jargon "uninstall" "$W/o7"
 bash "$WIZ" install --config-dir "$T" --yes >/dev/null 2>&1
 printf 'nope\n' | bash "$WIZ" uninstall --yes --and-my-memories --config-dir "$T" >"$W/o8" 2>&1
