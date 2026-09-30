@@ -109,6 +109,7 @@ Everything else is automatic.
 ## If something looks broken
 
 ```bash
+./install.sh --check                                                      # is the install current? read-only
 bash $CLAUDE_CONFIG_DIR/raememberit/engine/rebuild-index.sh               # regenerate the indexes
 python3 $CLAUDE_CONFIG_DIR/raememberit/engine/eval/run_eval.py --health   # structural check
 claude --bare                                                             # hooks OFF: tells kit from harness
