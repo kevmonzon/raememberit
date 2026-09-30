@@ -103,11 +103,13 @@ T_CAT=$(mktemp "$RAEMEMBERIT_MEM/.MEMORY-CATALOG.md.XXXXXX")
 T_DOMTMP=$(mktemp "$RAEMEMBERIT_MEM/.domain-index.XXXXXX")
 trap 'rm -f "$T_IDX" "$T_CAT" "$T_DOMTMP"' EXIT
 
-# BUDGET, not a prediction. The harness ceiling is undocumented and was only ever observed from
-# below (smallest payload seen truncated: 15,493 B on 2026-09-27). This is a MARGIN target that
-# keeps the payload far under any plausible ceiling; detecting an actual truncation is
-# hooks/truncation-tripwire.sh's job, from the artifacts the harness writes.
-BUDGET="${RAEMEMBERIT_ALWAYS_ON_BUDGET:-12000}"
+# BUDGET, not a prediction. The harness ceiling is undocumented and moves: the smallest payload seen
+# truncated was 15,493 B on 2026-09-27, then 10,291 B on 2026-09-30 — while a 9,317 B payload had
+# been delivered two days earlier. So the ceiling sat somewhere just above 9.3 KB that day, and the
+# old 12,000 B default was above it. This is a MARGIN target that keeps the payload under any ceiling
+# seen so far; detecting an actual truncation is hooks/truncation-tripwire.sh's job, from the
+# artifacts the harness writes, and that is what caught the move.
+BUDGET="${RAEMEMBERIT_ALWAYS_ON_BUDGET:-8000}"
 
 # ---- ALWAYS-ON ----------------------------------------------------------------------
 {

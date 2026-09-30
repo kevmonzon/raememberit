@@ -203,7 +203,7 @@ assert now["health"]["dangling"] == 0, "starter corpus now has dangling wikilink
 # scores above would keep reporting a corpus nobody ever saw.
 assert now["delivery"]["delivered"] is base["delivery"]["delivered"], \
     f"delivery: now {now['delivery']['delivered']}, baseline {base['delivery']['delivered']}"
-assert now["delivery"]["always_on_bytes"] < 12000, \
+assert now["delivery"]["always_on_bytes"] < 8000, \
     f"starter always-on tier is {now['delivery']['always_on_bytes']} B, at or over the default budget"
 print(f"literal {now['runs']['literal']['passed']}/{now['runs']['literal']['total']} · "
       f"expanded {now['runs']['expanded']['passed']}/{now['runs']['expanded']['total']} · "

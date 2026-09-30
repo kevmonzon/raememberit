@@ -6,7 +6,31 @@ behind each change lives in the commit that made it — `git log` is the long fo
 Versions before `0.4.0` predate this file; their history is in `git log` and is not reconstructed
 here, because a changelog written after the fact from subject lines is a guess wearing a date.
 
-## Unreleased
+## 0.6.1
+
+Three things the first live update of 0.6.0 measured, fixed the same evening, plus the
+documentation rework.
+
+### The always-on budget was above the harness ceiling
+
+The ceiling moved. A 9,317 B index was delivered on 2026-09-28; a 10,291 B one was truncated to a
+file preview on 2026-09-30 — the tripwire caught it on the very session that shipped 0.6.0. The
+default `RAEMEMBERIT_ALWAYS_ON_BUDGET` drops from 12,000 to **8,000**. A corpus over it will now be
+told so by the tripwire at the next session start; the fix is `scope: domain` on the rules that do
+not need to be in front of Claude before it knows what the task is, and a smaller
+`RAEMEMBERIT_RECENT_N`.
+
+### The router crashed on a dangling skill symlink
+
+`skills/<name>/SKILL.md` pointing nowhere: `glob()` returned it, `stat()` raised, and the router
+died on every prompt. Sources that cannot be stat'ed are skipped, and any other exception exits 0
+with one line on stderr — a hook must never break a prompt.
+
+### The settings merge rewrote every em-dash as `\u2014`
+
+`json.dump`'s default escaped every non-ASCII character in the settings file on each re-run:
+semantically identical, visibly vandalised, a diff nobody asked for. `ensure_ascii=False` in both
+the installer and the uninstaller, with a test.
 
 ### The documentation is a front page and a manual
 
@@ -19,6 +43,8 @@ the one page that says what runs by itself and what you run, and when. `QUICKSTA
 `tools/test-docs.sh` follows the moves: the hook table is asserted in `docs/commands.md`, every
 hook script must be explained there by name, the assertion count in `docs/development.md`, and
 every relative link in the README and the manual must point at a file that exists.
+
+465 assertions across nine suites, plus the lifecycle cycle outside them.
 
 ### A front door for people who do not know what a hook is
 

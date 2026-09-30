@@ -129,6 +129,14 @@ ckt "and it lands in the catalog"       "grep -q 'probe-note' '$MEM/MEMORY-CATAL
 
 echo "=== hooks merged, not replaced ==="
 ckt "their own hook survived"  "grep -q 'their-own-hook' '$T/settings.json'"
+# A non-ASCII character in their settings must come back as itself, not as a \u escape: the
+# default json.dump rewrote every em-dash in a live settings file on the first real update.
+python3 - "$T/settings.json" <<'PYU'
+import json,sys; p=sys.argv[1]; d=json.load(open(p)); d.setdefault("env",{})["THEIR_NOTE"]="keep — this dash"; json.dump(d,open(p,"w"),indent=2,ensure_ascii=False)
+PYU
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >/dev/null 2>&1
+ckt "a non-ASCII value in their settings survives a re-run unescaped" "grep -q 'keep — this dash' '$T/settings.json'"
+ckt "and is not turned into a \\u escape"                           "! grep -q 'u2014' '$T/settings.json'"
 ckt "their theme survived"     "grep -q '\"dark\"' '$T/settings.json'"
 M=$(grep -c '/raememberit/engine/hooks/' "$T/settings.json" | tr -d ' ')
 ckt "raememberit hooks wired (got $M)" "[ '$M' -ge 8 ]"

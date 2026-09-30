@@ -24,7 +24,7 @@ as `CLAUDE_PLUGIN_OPTION_*`; an explicit `RAEMEMBERIT_*` in `env` wins over an o
 | `RAEMEMBERIT_SWEEP_THRESHOLD` | `15` | new session logs before a pattern sweep is offered |
 | `RAEMEMBERIT_RECENT_N` | `8` | session logs listed in the always-on index |
 | `RAEMEMBERIT_DUPES` | `block` | the duplicate gate after a write: `block` exits 3 · `warn` reports · `off` skips. Start on `warn` when adopting a corpus that already has duplicates |
-| `RAEMEMBERIT_ALWAYS_ON_BUDGET` | `12000` | byte ceiling for the always-on index; over it, the index is still installed and `.index-status` records `OVER` |
+| `RAEMEMBERIT_ALWAYS_ON_BUDGET` | `8000` | byte ceiling for the always-on index; over it, the index is still installed and `.index-status` records `OVER` |
 | `RAEMEMBERIT_TRIPWIRE` | `on` | `off` disables the session-start truncation check |
 | `RAEMEMBERIT_TRIPWIRE_WINDOW_H` | `48` | how far back the tripwire looks; also how long a warning takes to clear itself |
 | `RAEMEMBERIT_PRECOMPACT_MSG` | (built-in) | the wording of the pre-compaction reminder |

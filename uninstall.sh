@@ -108,7 +108,7 @@ envs = 0
 for k in [k for k in env if k.startswith("RAEMEMBERIT_")]:
     env.pop(k); envs += 1
 if not env: d.pop("env", None)
-json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
+json.dump(d, open(p, "w"), indent=2, ensure_ascii=False); open(p, "a").write("\n")
 print(f"  \033[1;32m✓\033[0m {removed} hook group(s), {rules} permission rule(s) and {envs} env entr{"y" if envs == 1 else "ies"} removed; "
       f"everything else left as it was")
 PY

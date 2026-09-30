@@ -757,7 +757,10 @@ for r in rules:
     if r not in allow:
         allow.append(r); new_rules += 1
 
-json.dump(cur, open(set_p, "w"), indent=2); open(set_p, "a").write("\n")
+# ensure_ascii=False: the default rewrote every non-ASCII character in someone's settings — an
+# em-dash in a reminder's wording, a name — as a \uXXXX escape. Semantically identical, visibly
+# vandalised, and a diff nobody asked for on every re-run. Measured on the first live update.
+json.dump(cur, open(set_p, "w"), indent=2, ensure_ascii=False); open(set_p, "a").write("\n")
 if plugin_owns_hooks:
     if removed:
         print(f"  \033[1;32m✓\033[0m {removed} raememberit hook group(s) REMOVED from settings — the plugin\n      supplies them, and both together would fire every hook twice")
