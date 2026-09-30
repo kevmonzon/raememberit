@@ -49,9 +49,30 @@ done
 
 echo "=== the hook table is derived from the wiring, not typed ==="
 bash "$ROOT/tools/gen-hook-table.sh" > "$W/gen" 2>/dev/null
-sed -n '/^| Event | Matcher | Script | Timeout |/,/rebuild-index-hook/p' "$ROOT/README.md" > "$W/doc"
-if diff -q "$W/gen" "$W/doc" >/dev/null 2>&1; then ok "README hook table matches engine/settings.fragment.json"
-else bad "README hook table has drifted from the wiring" "$(diff "$W/gen" "$W/doc" | head -4)"; fi
+sed -n '/^| Event | Matcher | Script | Timeout |/,/rebuild-index-hook/p' "$ROOT/docs/commands.md" > "$W/doc"
+if diff -q "$W/gen" "$W/doc" >/dev/null 2>&1; then ok "docs/commands.md hook table matches engine/settings.fragment.json"
+else bad "docs/commands.md hook table has drifted from the wiring" "$(diff "$W/gen" "$W/doc" | head -4)"; fi
+# Every hook script the wiring names must be explained in the same page, by name.
+for h in $(jq -r '.hooks[][].hooks[].command' "$ROOT/engine/settings.fragment.json" | sed 's|.*/||' | sort -u); do
+  grep -q "\`$h\`" "$ROOT/docs/commands.md" && ok "docs/commands.md explains $h" || bad "docs/commands.md does not explain $h"
+done
+
+echo "=== every internal link in the docs resolves ==="
+# A manual whose links rot is one people stop opening. Relative links only; anchors are checked
+# loosely (the target file must exist; heading text is not verified).
+broken=""
+for f in "$ROOT/README.md" "$ROOT/docs"/*.md; do
+  for l in $(grep -oE '\]\(([^)#]+)(#[^)]*)?\)' "$f" | sed -E 's/^\]\(//; s/\)$//; s/#.*$//' | grep -vE '^(https?:|mailto:)' | sort -u); do
+    [ -e "$(dirname "$f")/$l" ] || broken="$broken
+  $(basename "$f") -> $l"
+  done
+done
+[ -z "$broken" ] && ok "every relative link in README.md and docs/ points at a file that exists" || bad "broken links" "$broken"
+for d in README.md getting-started.md how-it-works.md cadence.md commands.md configuration.md upgrading.md troubleshooting.md advanced.md development.md internals.md; do
+  [ -f "$ROOT/docs/$d" ] && ok "docs/$d exists" || bad "docs/$d is missing"
+done
+grep -q '```mermaid' "$ROOT/README.md" && grep -q '```mermaid' "$ROOT/docs/how-it-works.md" && grep -q '```mermaid' "$ROOT/docs/cadence.md" \
+  && ok "the README, how-it-works and cadence pages carry Mermaid diagrams" || bad "a Mermaid diagram is missing"
 
 echo "=== the plugin's hooks are generated from the settings fragment, not typed twice ==="
 # Two ways to wire the same hooks — a settings fragment the standalone installer merges, and the
@@ -130,7 +151,7 @@ F=$(bash "$ROOT/tools/test-tripwire.sh"     | tail -1 | awk '{print $1}')
 G=$(bash "$ROOT/tools/test-context.sh"      | tail -1 | awk '{print $1}')
 H=$(bash "$ROOT/tools/test-wizard.sh"       | tail -1 | awk '{print $1}')
 TOT=$((A+B+C+D+E+F+G+H))
-for f in README.md docs/ADOPTING.md; do
+for f in README.md docs/development.md; do
   claimed=$(grep -oE '[0-9]+ (automated )?assertions' "$ROOT/$f" | head -1 | awk '{print $1}')
   if [ -z "$claimed" ]; then ok "$f claims no assertion count"
   elif [ "$claimed" = "$TOT" ]; then ok "$f assertion count is current ($TOT)"

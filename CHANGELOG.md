@@ -8,6 +8,18 @@ here, because a changelog written after the fact from subject lines is a guess w
 
 ## Unreleased
 
+### The documentation is a front page and a manual
+
+`README.md` is a repository front page: what it is in four bullets, three commands to install,
+the five things you use, one diagram, a table of contents. Everything else moved into `docs/` —
+ten pages with an index, including [How it works](docs/how-it-works.md) with three Mermaid
+diagrams (a session, a memory's life, the loop between sessions) and [Cadence](docs/cadence.md),
+the one page that says what runs by itself and what you run, and when. `QUICKSTART.md`,
+`ADOPTING.md` and `ADVANCED.md` are folded in; `LIFECYCLE.md` is `docs/internals.md`.
+`tools/test-docs.sh` follows the moves: the hook table is asserted in `docs/commands.md`, every
+hook script must be explained there by name, the assertion count in `docs/development.md`, and
+every relative link in the README and the manual must point at a file that exists.
+
 ### A front door for people who do not know what a hook is
 
 `./raememberit install | update | status | uninstall`. One word, at most three plain questions,
