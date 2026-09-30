@@ -181,6 +181,19 @@ ckt "their own memory untouched"     "[ -f '$MEM/feedback/their-own-rule.md' ]"
 ck  "their user_profile NOT overwritten" "$(cat "$MEM/user_profile.md")" "custom"
 ckt "re-run reported leaving the corpus alone" "grep -qi 'left completely alone' '$T/log2'"
 
+echo "=== an over-budget always-on index does not turn an upgrade into a failure ==="
+# rebuild-index.sh exits 1 when the tier is over budget — a verdict about the corpus. Under the
+# installer's `set -e -o pipefail` that exit aborted the run at the Index step, after the engine and
+# hooks had already been replaced: verification skipped, no "Done", exit 1. Measured 2026-09-30.
+RAEMEMBERIT_ALWAYS_ON_BUDGET=100 "$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-over" 2>&1
+ck  "re-run exits 0 with an over-budget index" "$?" "0"
+ckt "it reports the budget verdict"            "grep -q 'over its budget' '$T/log-over'"
+ckt "and still reaches the end"                "grep -q 'Re-run this installer any time' '$T/log-over'"
+ckt "the verdict is on disk for the tripwire"  "grep -q '^OVER' '$MEM/.index-status'"
+# and a budget that fits leaves no warning behind
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-fits" 2>&1
+ckt "a fitting index produces no budget warning" "! grep -q 'over its budget' '$T/log-fits'"
+
 echo "=== --dry-run against an EXISTING install changes nothing ==="
 # The dangerous case. On a fresh target a dry-run has nothing to damage; against a populated config
 # it could rebuild an index, rewrite the fragment, or re-merge hooks. Fingerprint every file before

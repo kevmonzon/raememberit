@@ -8,6 +8,14 @@ here, because a changelog written after the fact from subject lines is a guess w
 
 ## Unreleased
 
+### An over-budget index made an upgrade report failure
+
+`rebuild-index.sh` exits 1 when the always-on tier is over budget — a verdict about the corpus.
+The installer runs under `set -e -o pipefail` and piped that exit through `sed`, so the run
+aborted at the Index step with the engine and hooks already replaced, verification skipped and
+no "Done": an upgrade that reported failure because the corpus it had correctly left alone was
+large. The verdict is now captured and reported, and the install completes and exits 0.
+
 ### Uninstall left the plugin's hooks firing at a removed engine
 
 On both plugin routes the hooks live in `skills/raememberit/` and nowhere in `settings.json`.

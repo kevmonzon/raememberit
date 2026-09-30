@@ -667,7 +667,18 @@ fi
 say "Index"
 if [ "$DRY" = 1 ]; then printf '  would: rebuild the indexes and verify\n'; else
   if [ "$PLUGINMODE" = 1 ]; then ENG="$SRC/engine"; else ENG="$TARGET/raememberit/engine"; fi
-  CLAUDE_CONFIG_DIR="$TARGET" RAEMEMBERIT_MEMORY_DIR="$MEM" bash "$ENG/rebuild-index.sh" | sed 's/^/  /'
+  # THE REBUILD'S EXIT CODE IS A VERDICT ABOUT THE CORPUS, NOT ABOUT THIS INSTALL. It exits 1 when the
+  # always-on tier is over budget — and this script runs under `set -e -o pipefail`, so piping it
+  # through sed used to abort the installer right here: engine and hooks already replaced, the
+  # verification below skipped, "Done" never printed, exit 1. An upgrade that reported failure because
+  # the corpus it had just correctly left alone was large. Measured 2026-09-30. Capture, report, go on.
+  RB_RC=0
+  RB_OUT=$(CLAUDE_CONFIG_DIR="$TARGET" RAEMEMBERIT_MEMORY_DIR="$MEM" bash "$ENG/rebuild-index.sh" 2>&1) || RB_RC=$?
+  printf '%s\n' "$RB_OUT" | sed 's/^/  /'
+  if [ "$RB_RC" != 0 ]; then
+    warn "the always-on index is over its budget (see above). The install itself is complete;"
+    warn "  demote feedback memories with \`metadata.scope: domain\` when convenient. Verdict in $MEM/.index-status"
+  fi
   # No installed command files to check in plugin mode — the plugin's are managed and carry no slots.
   [ "$PLUGINMODE" = 1 ] || bash "$SRC/tools/check-filled.sh" "$TARGET/commands" | sed 's/^/  ✓ /'
   CLAUDE_CONFIG_DIR="$TARGET" RAEMEMBERIT_MEMORY_DIR="$MEM" python3 "$ENG/eval/run_eval.py" --health \
