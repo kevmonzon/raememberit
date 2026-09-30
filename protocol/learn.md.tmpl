@@ -89,6 +89,7 @@ description: <one line — this is what gets injected and indexed, so make it a 
 metadata:
   type: feedback | project | reference
   scope: global | domain          # feedback only — see below; omit and it means global
+  domain: <repo-or-tool>          # optional, any type — kebab-case, comma-separated; see below
 ---
 
 <the fact, stated so it is actionable a month from now>
@@ -111,6 +112,7 @@ The helper also **enforces** what the template above only shows, and refuses the
 | `name:` not matching the filename | the index keys on `name:`, so a mismatch makes the entry point nowhere |
 | a missing `metadata.type:` | it decides which tier the memory lands in |
 | a `metadata.scope:` that is not `global` or `domain` | a typo would silently take the default and seat a domain rule in every context window |
+| a `metadata.domain:` that is not kebab-case tokens | a typo would route to nothing, silently — the tag exists only to be matched |
 | `feedback` or `project` with no **Why:** / **How to apply:** | a rule without its incident is unarguable later, and one without an action is unusable |
 | an existing file, unless you pass `--update` | that is step 2's verdict, enforced |
 
@@ -129,6 +131,12 @@ An always-on tier that only ever grows stops being delivered at all: past an und
 ceiling the harness silently swaps the whole index for a file preview, and nothing errors. That is
 what `RAEMEMBERIT_ALWAYS_ON_BUDGET` and the SessionStart tripwire exist for, and neither of them can
 make this judgement for you.
+
+**Name the domain when there is one.** `metadata.domain:` takes the repo, tool or ticket prefix a
+memory is about (`payments`, `billing-api, node`). It costs nothing at retrieval — `/recall` still greps —
+but it is what lets the prompt-time hook surface the memory unasked when a task's working directory
+or prompt names that domain. A project or reference memory about one repo should carry it; a global
+rule should not.
 
 A slug filename, **not** a dated one — dates are for interaction logs. Convert relative dates in the
 body to absolute; "last Tuesday" is unreadable in a month. Link related memories with `[[slug]]`,

@@ -104,6 +104,23 @@ it. **An absent `scope` means `global`** — deliberately, because defaulting ab
 would empty the always-on tier on the first rebuild after upgrading, which is a far worse failure
 than carrying one rule too many.
 
+Any memory may also declare a **domain** — the repo, tool or ticket prefix it is about:
+
+```yaml
+metadata:
+  type: reference
+  domain: payments, mysql
+```
+
+The write helper enforces the shape (kebab-case tokens, comma-separated). `rebuild-index.sh` appends
+` · domain: …` to the catalog line and writes a third derived file, `memory/.domain-index`, one row per
+(domain, memory). Nothing in retrieval *requires* it; it exists so the prompt-time hook can surface a
+memory when the working directory or the prompt names its domain, without opening every file.
+
+The catalog also lists Claude Code's own per-project auto-memory (`projects/*/memory/`) under a
+*Native auto-memory* heading — read-only, never scored, never in the always-on tier — so one grep
+covers both silos instead of `/recall` needing a separate glob for the second.
+
 The tier has a byte budget (`RAEMEMBERIT_ALWAYS_ON_BUDGET`) because the harness silently declines to
 inject an oversized payload: it writes the payload to a file, hands the model a short preview and a
 path, and reports no error. `rebuild-index.sh` records the verdict in `.index-status`; the
@@ -313,7 +330,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-339 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+358 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone

@@ -73,6 +73,16 @@ if [ "$TYPE" != log ]; then
       *) printf 'mem-write: metadata.scope must be `global` or `domain` (got %s)\n' "$SCOPE" >&2; exit 1 ;;
     esac
   fi
+  # ---- optional routing: metadata.domain, any type ----
+  # One or more kebab-case tokens, comma-separated — a repo name, a tool, a ticket prefix. Nothing
+  # reads it for retrieval quality; it exists so a hook can surface the memory when a prompt or the
+  # working directory names that domain, without scanning every file. A typo would silently route
+  # nowhere, so the shape is enforced here, on the way in.
+  DOMAIN=$(printf '%s\n' "$BODY" | awk 'NR<=20 && /^  domain:/{sub(/^  domain:[ ]*/,""); gsub(/^"|"$/,""); print; exit}')
+  if [ -n "${DOMAIN:-}" ]; then
+    printf '%s\n' "$DOMAIN" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -vqE '^[a-z0-9][a-z0-9.-]*$' \
+      && { printf 'mem-write: metadata.domain must be kebab-case tokens separated by commas (got %s)\n' "$DOMAIN" >&2; exit 1; }
+  fi
   if [ "$TYPE" = feedback ] || [ "$TYPE" = project ]; then
     printf '%s\n' "$BODY" | grep -q '\*\*Why:\*\*' \
       || { printf 'mem-write: %s memories must carry a **Why:** line\n' "$TYPE" >&2; exit 1; }

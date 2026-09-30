@@ -86,7 +86,10 @@ python3 engine/eval/run_eval.py
 grep -i "<topic>" "$MEM/MEMORY-CATALOG.md"
 ```
 
-Each hit is `- [name](path) — description`. Read the **file**, not just the line.
+Each hit is `- [name](path) — description`, with ` · domain: <tag>` appended when the memory
+declares one — so a repo or tool name matches tagged memories even when the description does not
+say it. Read the **file**, not just the line. The catalog also lists Claude Code's own auto-memory
+under *Native auto-memory*, read-only, so one grep covers both silos.
 
 ### 3. Interaction-log sweep — content first
 

@@ -8,6 +8,14 @@ here, because a changelog written after the fact from subject lines is a guess w
 
 ## Unreleased
 
+### Memories can name their domain, and the second silo is in the catalog
+
+`metadata.domain:` — a repo, tool or ticket prefix, kebab-case, comma-separated — is accepted on
+any memory and enforced on write. The catalog line shows it, and `rebuild-index.sh` writes a third
+derived file, `memory/.domain-index`, one row per (domain, memory), for the prompt-time hook that
+follows. Claude Code's own per-project auto-memory is now listed in the on-demand catalog under its
+own heading, read-only and never scored, so one grep covers both silos.
+
 ### Smaller things found by the same audit
 
 - **`--hooks-from-plugin` is now the recommended route.** It is the one the kit's author runs, the

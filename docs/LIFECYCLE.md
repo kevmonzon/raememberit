@@ -342,6 +342,7 @@ inspect first.
 | `<corpus>/.seeded-starters` | `install.sh` | never | which starter rules this corpus ever received, so a `--force` top-up never re-adds one you deleted |
 | `raememberit/shipped/<name>` | `install.sh` on a skip | you | recovering a shipped command you chose not to take |
 | `$CLAUDE_PLUGIN_DATA/bin/mem-write.sh` | `place-shim.sh` | plugin removal | a version-free path for the permission rule |
+| `<corpus>/.domain-index` | `rebuild-index.sh` | next rebuild | domain → memory rows, read by the prompt-time context router |
 | `<corpus>/.index-status` | `rebuild-index.sh` | next rebuild | the always-on budget verdict, `OK`/`OVER`, surfaced by the tripwire |
 | `<corpus>/.index-rebuild.log` | `rebuild-index-hook.sh` | next rebuild | the rebuild's own output, which used to go to `/dev/null` |
 | `starter/baseline.json` | the maintainers | — | the frozen retrieval score CI holds the kit to |
