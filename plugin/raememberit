@@ -111,7 +111,7 @@ engine_changed() {  # prints the changed files, or "unknown" when there is no re
   if [ ! -f "$man" ]; then printf 'unknown'; return 0; fi
   # basenames only: the folder a tool lives in is not something the person needs to know
   # Same exclusions as the installer's manifest: a __pycache__ Python wrote is not an edit.
-  (cd "$eng" && find . -type f ! -path '*/__pycache__/*' ! -name '*.pyc' ! -name '.DS_Store' | sort | xargs shasum 2>/dev/null) | diff "$man" - | grep '^[<>]' | awk '{print $3}' | sed 's|.*/||' | sort -u
+  (cd "$eng" && find . -type f ! -path '*/__pycache__/*' ! -name '*.pyc' ! -name '.DS_Store' | sort | xargs shasum 2>/dev/null) | diff <(grep -vE '__pycache__|\.pyc$|\.DS_Store$' "$man") - | grep '^[<>]' | awk '{print $3}' | sed 's|.*/||' | sort -u
 }
 engine_current() { [ -z "$(diff -rq -x __pycache__ -x '*.pyc' -x .DS_Store "$SRC/engine" "$(installed_engine)" 2>/dev/null | grep -v settings.fragment.json)" ]; }
 # WHICH WAY IT WAS INSTALLED. The front door used to run the recommended route for every update,

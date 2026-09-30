@@ -401,7 +401,9 @@ else
   engine_manifest() { (cd "$1" && find . -type f ! -path '*/__pycache__/*' ! -name '*.pyc' ! -name '.DS_Store' | sort | xargs shasum 2>/dev/null); }
   if [ -d "$TARGET/raememberit/engine" ]; then
     if [ -f "$EMAN" ]; then
-      CHANGED=$(engine_manifest "$TARGET/raememberit/engine" | diff "$EMAN" - | grep '^[<>]' | awk '{print $3}' | sort -u || true)
+      # A record written before 0.6.4 lists the cache; filter it from that side too, or the first
+      # upgrade after the fix reports the very artifact the fix exists to ignore, once.
+      CHANGED=$(engine_manifest "$TARGET/raememberit/engine" | diff <(grep -vE '__pycache__|\.pyc$|\.DS_Store$' "$EMAN") - | grep '^[<>]' | awk '{print $3}' | sort -u || true)
     else
       CHANGED="(no engine record — installed before 0.6.0, so local patches cannot be told apart)"
     fi

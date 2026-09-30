@@ -217,6 +217,12 @@ mkdir -p "$T/raememberit/engine/eval/__pycache__"; printf 'bytecode' > "$T/raeme
 ckt "a bytecode cache is not reported as a local patch" "! grep -q 'cpython' '$T/log-eng-pyc'"
 ckt "and does not make the upgrade keep engine.prev"    "[ ! -d '$T/raememberit/engine.prev' ]"
 ckt "the manifest does not list the cache either"       "! grep -q 'pycache' '$T/raememberit/.installed-engine'"
+# A record written by 0.6.3 lists the cache. The first upgrade after the fix must not report it.
+printf '%s  ./eval/__pycache__/run_eval.cpython-314.pyc\n' "$(printf bytecode | shasum | awk '{print $1}')" >> "$T/raememberit/.installed-engine"
+mkdir -p "$T/raememberit/engine/eval/__pycache__"; printf 'bytecode' > "$T/raememberit/engine/eval/__pycache__/run_eval.cpython-314.pyc"
+"$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-eng-pyc2" 2>&1
+ckt "an old record that lists the cache is not reported as a patch either" "! grep -q 'cpython' '$T/log-eng-pyc2'"
+ckt "and that upgrade keeps no engine.prev"                                "[ ! -d '$T/raememberit/engine.prev' ]"
 # An install from before the record: the engine cannot be compared, so it is kept once regardless.
 rm "$T/raememberit/.installed-engine"
 "$ROOT/install.sh" --config-dir "$T" --user Casey --no-guided >"$T/log-eng3" 2>&1

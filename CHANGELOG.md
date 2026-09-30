@@ -15,8 +15,9 @@ Importing the eval harness, which anything that runs it in-process does, leaves
 `status` said an update was due and the update preview said "you changed some of the background
 tools yourself (run_eval.cpython-314.pyc)" about an install nobody had touched. The engine
 record, the plugin fingerprint and the "is the engine current" check now all ignore
-`__pycache__`, `*.pyc` and `.DS_Store`. Three assertions in `tools/test-install.sh` and one in
-`tools/test-wizard.sh` pin it.
+`__pycache__`, `*.pyc` and `.DS_Store` — on both sides of the comparison, so a record written by
+0.6.3 that lists the cache does not make the first upgrade after this one report it either. Five
+assertions in `tools/test-install.sh` and one in `tools/test-wizard.sh` pin it.
 
 ## 0.6.3
 
