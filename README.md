@@ -293,7 +293,7 @@ write left a near-duplicate behind.
 tools/test-all.sh
 ```
 
-296 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
+307 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
 schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
 
 Plus two things that check the project against itself rather than against an expectation someone
@@ -350,9 +350,11 @@ A test that reads the thing it is isolating from has proven nothing.
 ./uninstall.sh --purge  # also deletes them, after asking you to type DELETE
 ```
 
-It removes only its own hooks, commands, permission rules and env entry. Your settings, your own
-hooks and your notes are untouched — asserted, not merely promised. Memories are plain markdown and
-stay readable with this tool gone.
+It removes only its own hooks, commands, permission rules, env entries, and the plugin directory it
+placed at `skills/raememberit/` (checked by manifest name, so a same-named directory that is not ours
+survives). Your settings, your own hooks and your notes are untouched — asserted, not merely promised,
+including that no surviving hook points at a file that is gone. Memories are plain markdown and stay
+readable with this tool gone.
 
 ## License
 

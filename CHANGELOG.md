@@ -8,6 +8,15 @@ here, because a changelog written after the fact from subject lines is a guess w
 
 ## Unreleased
 
+### Uninstall left the plugin's hooks firing at a removed engine
+
+On both plugin routes the hooks live in `skills/raememberit/` and nowhere in `settings.json`.
+`uninstall.sh` stripped settings and removed the engine — and left that directory behind, so
+nine hooks kept firing every session at a path that no longer existed. It now removes the
+directory when its manifest says it is raememberit's, strips every `RAEMEMBERIT_*` env entry
+rather than only the corpus path, and the suite asserts that after an uninstall on any route no
+surviving hook points at a missing file.
+
 ### A deleted starter rule came back on the next `--force`
 
 Topping up a scaffold copied in every shipped starter that was absent, which cannot tell "never

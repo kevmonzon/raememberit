@@ -675,6 +675,53 @@ printf '%s' "$out_b" | grep -q "corpus at $tb/elsewhere" \
   || bad "the variable is ignored even when no --config-dir was given"
 rm -rf "$(dirname "$ta")" "$(dirname "$decoy")" "$(dirname "$tb")"
 
+echo "== uninstall leaves no hook firing at a removed engine, on either plugin route =="
+# uninstall.sh stripped settings and removed the engine — and left skills/raememberit/ behind, so on
+# both plugin routes nine hooks kept firing every session at a path that no longer existed. Measured
+# 2026-09-30. The generic assertion is the one that matters: after uninstall, every hook command that
+# survives anywhere must resolve to a file that exists.
+hooks_dangling() {  # $1 = config dir; prints hook commands whose target does not exist
+  python3 - "$1" <<'PYH'
+import glob, json, os, sys
+cfg = sys.argv[1]; cmds = []
+for f in [cfg + "/settings.json"] + glob.glob(cfg + "/skills/*/hooks/hooks.json"):
+    if not os.path.exists(f): continue
+    for groups in (json.load(open(f)).get("hooks") or {}).values():
+        for g in groups:
+            for h in g.get("hooks", []): cmds.append(h.get("command") or "")
+for c in cmds:
+    p = c.replace("${CLAUDE_CONFIG_DIR:-$HOME/.claude}", cfg).split(" ")[0]
+    if p.startswith("/") and not os.path.exists(p): print(c)
+PYH
+}
+for route in --as-plugin --hooks-from-plugin; do
+  tu="$(mktemp -d)/.claude"
+  bash install.sh $route --config-dir "$tu" --no-guided --user Tester >/dev/null 2>&1
+  # a plugin that is NOT ours, under a different name, must survive
+  mkdir -p "$tu/skills/other-plugin/.claude-plugin"; printf '{"name":"other-plugin","version":"1.0.0"}\n' > "$tu/skills/other-plugin/.claude-plugin/plugin.json"
+  python3 - "$tu/settings.json" <<'PYE'
+import json,sys; p=sys.argv[1]; d=json.load(open(p)); d.setdefault("env",{}).update({"RAEMEMBERIT_REQUIRE_LOG":"strict","THEIRS":"keep"}); json.dump(d,open(p,"w"),indent=2)
+PYE
+  out_u="$(bash uninstall.sh --config-dir "$tu" 2>&1)"
+  [ -d "$tu/skills/raememberit" ] && bad "$route: skills/raememberit survives uninstall — its hooks keep firing" \
+                                  || ok "$route: the plugin directory is removed by uninstall"
+  printf '%s' "$out_u" | grep -q 'plugin directory removed' && ok "$route: and uninstall says so" || bad "$route: uninstall is silent about the plugin directory"
+  d="$(hooks_dangling "$tu")"
+  [ -z "$d" ] && ok "$route: no surviving hook points at a missing file" || bad "$route: dangling hook(s) after uninstall: $d"
+  [ -d "$tu/skills/other-plugin" ] && ok "$route: someone else's plugin is untouched" || bad "$route: removed a plugin that was not ours"
+  python3 -c 'import json,sys; e=json.load(open("'"$tu"'/settings.json")).get("env",{}); sys.exit(0 if not any(k.startswith("RAEMEMBERIT_") for k in e) and e.get("THEIRS")=="keep" else 1)' \
+    && ok "$route: every RAEMEMBERIT_* env entry is stripped, theirs is kept" \
+    || bad "$route: env not cleaned correctly after uninstall"
+  rm -rf "$(dirname "$tu")"
+done
+# A directory named raememberit whose manifest is NOT ours is left alone.
+tv="$(mktemp -d)/.claude"; mkdir -p "$tv/skills/raememberit/.claude-plugin"
+printf '{"name":"someone-elses","version":"1.0.0"}\n' > "$tv/skills/raememberit/.claude-plugin/plugin.json"
+bash uninstall.sh --config-dir "$tv" >/dev/null 2>&1
+[ -d "$tv/skills/raememberit" ] && ok "a same-named directory with a foreign manifest is left alone" \
+                                || bad "removed a same-named directory that was not ours"
+rm -rf "$(dirname "$tv")"
+
 echo "== this suite must not inherit the developer's own configuration =="
 for v in RAEMEMBERIT_MEMORY_DIR RAEMEMBERIT_DUPES RAEMEMBERIT_REQUIRE_LOG RAEMEMBERIT_USER; do
   eval "val=\${$v:-}"

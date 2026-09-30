@@ -287,8 +287,8 @@ files this way.
 ./uninstall.sh --purge  # also deletes them, after you type DELETE
 ```
 
-It removes only its own hooks, commands, permission rules and env entry — asserted by test, not
-merely promised. Your own hooks, rules and settings are untouched, and the memories remain plain
+It removes only its own hooks, commands, permission rules, env entries and the plugin directory
+it placed — asserted by test, not merely promised, on all three routes. Your own hooks, rules and settings are untouched, and the memories remain plain
 markdown that stays readable with this tool gone.
 
 A tool nobody can back out of cleanly is a tool nobody should adopt.

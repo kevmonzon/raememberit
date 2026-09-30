@@ -61,6 +61,20 @@ for c in recall learn memory-reflect memory-audit skill-mine; do
   [ -f "$TARGET/commands/$c.md" ] && run rm -f "$TARGET/commands/$c.md"
 done
 ok "engine and commands removed"
+# THE PLUGIN DIRECTORY. Two of the three install routes put the hooks in <config>/skills/raememberit/
+# and nothing in settings.json. This script stripped settings and removed the engine — and left that
+# directory behind, so nine hooks kept firing every session at a path that no longer existed. Measured
+# 2026-09-30 on both routes. Remove it, but only when its manifest says it is ours: a directory with
+# that name and someone else's manifest is theirs.
+SK="$TARGET/skills/raememberit"
+if [ -f "$SK/.claude-plugin/plugin.json" ]; then
+  if jq -e '.name == "raememberit"' "$SK/.claude-plugin/plugin.json" >/dev/null 2>&1; then
+    run rm -rf "$SK"
+    ok "plugin directory removed — its hooks would otherwise keep firing at the removed engine"
+  else
+    warn "$SK exists but its manifest is not raememberit's — left alone"
+  fi
+fi
 
 say "Settings"
 if [ -f "$TARGET/settings.json" ] && [ "$DRY" = 0 ]; then
@@ -84,11 +98,15 @@ for k in ("allow", "deny", "ask"):
         rules += before - len(perm[k])
         if not perm[k]: del perm[k]
 if not perm: d.pop("permissions", None)
+# Every knob, not only the corpus path: a leftover RAEMEMBERIT_REQUIRE_LOG=strict or DUPES=block is
+# inert once the engine is gone, but it is litter that looks like configuration.
 env = d.get("env", {})
-envs = 1 if env.pop("RAEMEMBERIT_MEMORY_DIR", None) else 0
+envs = 0
+for k in [k for k in env if k.startswith("RAEMEMBERIT_")]:
+    env.pop(k); envs += 1
 if not env: d.pop("env", None)
 json.dump(d, open(p, "w"), indent=2); open(p, "a").write("\n")
-print(f"  \033[1;32m✓\033[0m {removed} hook group(s), {rules} permission rule(s) and {envs} env entry removed; "
+print(f"  \033[1;32m✓\033[0m {removed} hook group(s), {rules} permission rule(s) and {envs} env entr{"y" if envs == 1 else "ies"} removed; "
       f"everything else left as it was")
 PY
 else
