@@ -1,319 +1,103 @@
 # raememberit
 
-An opinionated memory discipline for [Claude Code](https://claude.com/claude-code): a
-two-tier context budget, indexes generated from frontmatter, hooks that make capture
-involuntary, commands that make retrieval reflexive, and an eval harness that keeps the
-whole thing honest.
+**Memory for Claude Code that survives the session.** Plain markdown, no database, one command.
 
-Markdown is the source of truth. Every index is derived and regenerable. There is no
-database, no vector store, and no daemon — the corpus survives a `cp -r`.
+[![CI](https://github.com/kevmonzon/raememberit/actions/workflows/ci.yml/badge.svg)](https://github.com/kevmonzon/raememberit/actions/workflows/ci.yml)
+![bash 3.2](https://img.shields.io/badge/bash-3.2%2B-blue)
+![license MIT](https://img.shields.io/badge/license-MIT-green)
 
-**Status: alpha.** Extracted from a working single-user setup; installable with one command.
+Claude Code forgets everything when a session ends. raememberit gives it a memory folder you own —
+standing rules it reads every time, project notes it looks up when a task touches them, and a log of
+every session — with hooks that make capturing a fact involuntary and looking one up reflexive.
 
-## What it is
-
-| | |
-|---|---|
-| `engine/` | index generator, eval harness, hooks |
-| `protocol/` | the commands that operate the corpus — recall, learn, reflect, audit, mine |
-| `scaffold/` | the empty corpus layout a fresh install gets |
-| `starter/` | a small set of generic engineering rules, each shipping with its evidence |
-| `starter/optional/` | rules that are working preferences rather than engineering truths — opt in, not installed |
-| `tools/` | the sanitization gate and its self-test |
-
-## What it is not
-
-Not RAG. Not a vector store. Not a ticket tracker. Not a framework you build on — a
-discipline you adopt, in plain files you can read and delete.
+- **Two tiers, one budget.** Standing rules are injected once per context; everything else is a
+  one-line pointer pulled in only when a topic arises. The always-on tier has a byte budget and a
+  tripwire, because context is the scarcest resource here.
+- **Capture is enforced, not requested.** A correction-shaped prompt gets a nudge. A write goes
+  through a helper that refuses a memory without a description, a rule without its incident, or a
+  near-duplicate of one that exists.
+- **Retrieval does not depend on remembering to retrieve.** A router scores every prompt against
+  your memories and your installed skills — quietly logging until you have seen its precision, then
+  surfacing them.
+- **Nothing to run.** No daemon, no vector store, no service. The folder survives a `cp -r`, and
+  every index is regenerated from the files.
 
 ## Install
 
 ```bash
-git clone <the address GitHub shows under the green "Code" button>
+git clone https://github.com/kevmonzon/raememberit.git
 cd raememberit
 ./raememberit install
 ```
 
-That is the whole thing. It looks at your computer, asks what Claude should call you, shows you
-what it is about to do, and does it after you say yes. It creates your memory folder with eleven
-starter rules, lets Claude save memories without asking every time, adds a short note to your
-`CLAUDE.md` (shown first; the file is created if you do not have one), and ends with a two-minute
-try-it. Nothing else on your computer is touched.
+It looks at your computer, asks what Claude should call you, shows what it is about to do, and does
+it after you say yes. Two minutes later you have made a memory in one session and found it in the
+next. **[Getting started →](docs/getting-started.md)**
+
+Requires Claude Code, `git`, `jq`, `python3`. macOS or Linux.
+
+## Use it
 
 | | |
 |---|---|
-| `./raememberit status` | is it installed, is it current, is anything wrong — read-only |
-| `./raememberit update` | after `git pull`: what will change, then the update, then what changed |
-| `./raememberit uninstall` | removes the tools; your memories stay, in plain text, where they were |
+| `/recall <topic>` | before investigating anything cold — a repo, a ticket, an error, a tool |
+| `/learn` | the moment you are corrected, or a fact costs real effort |
+| `./raememberit status` | is it installed, is it current, is anything wrong |
+| `./raememberit update` | after `git pull` — shows what will change, then what changed |
+| `./raememberit uninstall` | removes the tools; your memories stay, in plain text |
 
-Add `--yes` to any of them to take every default without being asked. Re-running is always safe:
-an update never touches your memories, never overwrites a command you edited, and keeps a copy of
-anything you changed in the tools before replacing them.
+The rest runs on its own. What little does not, and how often, is on one page:
+**[Cadence →](docs/cadence.md)**
 
-Everything the installer can do beyond that — three install routes, every flag, adopting into a
-setup that already has memory hooks of its own — is in **[`docs/ADVANCED.md`](docs/ADVANCED.md)**.
+## How it works
 
-## Hooks
-
-Generated by `tools/gen-hook-table.sh` from `engine/settings.fragment.json` — never
-hand-written. In the setup this was extracted from, the hand-written table documented a
-`SessionStart` hook that existed in no settings file, and a guard-file claim that flipped
-three times across three audits because each one read the previous audit's prose instead of
-the file.
-
-| Event | Matcher | Script | Timeout |
-|---|---|---|---|
-| `SessionStart` | _(all)_ | `skillmine-nag.sh` | 5s |
-| `SessionStart` | _(all)_ | `truncation-tripwire.sh` | 5s |
-| `UserPromptSubmit` | _(all)_ | `inject-memory.sh` | 5s |
-| `UserPromptSubmit` | _(all)_ | `context-router.sh` | 5s |
-| `UserPromptSubmit` | _(all)_ | `correction-nudge.sh` | 5s |
-| `PreCompact` | `auto` | `precompact-notice.sh` | 5s |
-| `PostCompact` | _(all)_ | `rearm-inject.sh` | 5s |
-| `Stop` | _(all)_ | `require-log.sh` | 5s |
-| `Stop` | _(all)_ | `learn-nag.sh` | 5s |
-| `SessionEnd` | `clear` | `close-log.sh` | 5s |
-| `SessionEnd` | `clear` | `rearm-inject.sh` | 5s |
-| `SessionEnd` | _(all)_ | `rebuild-index-hook.sh` | 5s |
-
-Every command resolves through `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`, so the same wiring
-works in a default install and in an isolated sandbox with no rewriting. `CLAUDE_CONFIG_DIR`
-relocates the config but does **not** change `$HOME` — a hook that hardcodes `~/.claude`
-keeps writing the default corpus even when the session is pointed elsewhere.
-
-### Knobs
-
-| Variable | Default | Effect |
-|---|---|---|
-| `RAEMEMBERIT_REQUIRE_LOG` | `warn` | `warn` reminds and allows the session to end · `strict` blocks it · `off` silent |
-| `RAEMEMBERIT_SWEEP_THRESHOLD` | `15` | new interaction logs before a pattern sweep is offered |
-| `RAEMEMBERIT_RECENT_N` | `8` | interaction logs surfaced in the always-on index |
-| `RAEMEMBERIT_MEMORY_DIR` | `<config>/memory` | corpus location override |
-| `RAEMEMBERIT_DUPES` | `block` | `block` refuses a write that leaves a near-duplicate · `warn` reports · `off` skips |
-| `RAEMEMBERIT_PRECOMPACT_MSG` | (built-in) | replaces the pre-compaction reminder's wording |
-| `RAEMEMBERIT_ALWAYS_ON_BUDGET` | `12000` | byte ceiling for the always-on index; over it, `rebuild-index.sh` installs the index anyway and records `OVER` in `.index-status` |
-| `RAEMEMBERIT_TRIPWIRE` | `on` | `off` disables the SessionStart truncation check |
-| `RAEMEMBERIT_TRIPWIRE_WINDOW_H` | `48` | how far back the tripwire looks for truncated injections; also how long a warning takes to clear itself |
-| `RAEMEMBERIT_QUERIES` | `<corpus>/eval/queries.json` | the query file the eval harness scores against |
-| `RAEMEMBERIT_DENYLIST` | `.denylist.local.txt` | a private vocabulary file for the sanitization gate |
-| `RAEMEMBERIT_AUTORECALL` | `shadow` | the prompt-time router's memory half: `shadow` logs what it would surface to `memory/.recall-log` and injects nothing · `inject` adds the best few catalog lines to the prompt's context · `off` |
-| `RAEMEMBERIT_SKILLROUTER` | `shadow` | its skill half: `shadow` logs matching commands and skills to `memory/.skill-log` · `inject` names them in context · `off` |
-| `RAEMEMBERIT_AUTORECALL_BUDGET` | `1500` | byte ceiling for the injected memory block |
-| `RAEMEMBERIT_ROUTER_MAX` | `3` | entries per injected block |
-| `RAEMEMBERIT_CORRECTIONS` | `nudge` | the correction detector: `nudge` logs a prompt that reads like a correction to `memory/.corrections-log` and adds one line naming `/learn`; at Stop, two corrections with no feedback write since the first get one reminder · `strict` makes that reminder block the stop · `shadow` logs only · `off` |
-
-Three more variables exist but are **configuration, not knobs**: `RAEMEMBERIT_USER`,
-`RAEMEMBERIT_PERSONA_FILE` and `RAEMEMBERIT_VOCAB_FILE`. On the standalone route they are the
-`--user`, `--persona` and `--vocabulary` flags, remembered in `raememberit/.config` so a bare re-run
-inherits them rather than silently reverting to the defaults; on the plugin route they arrive as the
-`USER`, `PERSONAFILE` and `VOCABULARYFILE` options. Setting them in `env` works, but the flag or the
-option is the intended door.
-
-A knob exists wherever an adopted setup might reasonably differ. Editing the hook scripts directly
-would not survive an upgrade — `install.sh` replaces the whole `engine/` directory — so anything worth
-keeping belongs in `settings.json` `env`, not in the script. If you patch the engine anyway, the
-upgrade will not lose it silently: the install records a manifest of the engine it wrote, and a
-re-run names every file that differs and keeps the whole previous engine at `raememberit/engine.prev`
-with a runnable `diff -r`. A clean upgrade removes that directory, so its presence means exactly one
-thing.
-
-`RAEMEMBERIT_REQUIRE_LOG` defaults to **warn**, not strict. The upstream single-user setup blocked
-the stop; that is a reasonable choice for its author and a hostile default for anyone else — a
-hook that refuses to let someone end their session is the fastest route to the kit being
-uninstalled.
-
-### The prompt-time router — retrieval that does not depend on remembering to retrieve
-
-`context-router.sh` runs on every prompt. It tokenizes the prompt, the working directory's name and
-any ticket key, scores them against every catalog line and the domain index, and against the
-`description:` of every installed command and skill, and surfaces the best few of each. No model
-call, tens of milliseconds, once per hit per session.
-
-**Both halves default to `shadow`**: they write what they *would* have surfaced to
-`memory/.recall-log` and `memory/.skill-log` and inject nothing. That is deliberate. Injection is the
-scarcest resource here, and a hook that injects before its precision is measured is the always-on tier
-growing by another door. Run it in shadow for a week, have `/memory-audit` sample the log, then flip
-to `inject` with the number in hand. `/recall` writes the same log for manual sweeps, so together they
-are the only record of which memories are ever read — the audit uses it to shortlist memories nobody
-has retrieved in months, which is how the corpus prunes itself instead of only growing.
-
-### The correction detector — `/learn`'s trigger as a process
-
-`/learn` is meant to fire the moment you are corrected. That trigger lived in prose, and the moment it
-most needs to fire is the moment the model is busy being wrong. `correction-nudge.sh` matches a small
-set of strong correction shapes against every prompt — a leading *"No,"*, *"I told you"*, *"you should
-have"*, not *"always"* or *"never"*, which are everywhere — logs the hit to `memory/.corrections-log`,
-and in `nudge` mode adds one line of context naming `/learn`, at most once per ten minutes. At Stop,
-`learn-nag.sh` notices a session with two or more corrections and no `feedback/` memory newer than the
-first, and says so once; `strict` makes it block. The log is what `/skill-mine` reads for friction — a
-correction that recurs across sessions with nothing written down outranks everything else it finds.
-
-### Tiering the always-on index
-
-`MEMORY.md` is injected into every context window; `MEMORY-CATALOG.md` is read on demand. Only
-`feedback` memories land in the always-on tier, and each one may declare which tier it belongs to:
-
-```yaml
-metadata:
-  type: feedback
-  scope: global   # or: domain
+```mermaid
+flowchart LR
+    A([session starts]) --> B[standing rules<br/>injected once]
+    B --> C[you type a prompt]
+    C --> D{router}
+    D -->|matches a memory or skill| E[surfaced — or logged,<br/>in shadow mode]
+    D -->|reads like a correction| F[nudge: /learn]
+    C --> G[work]
+    G -->|something cold| H[/recall/]
+    G -->|corrected| I[/learn/]
+    I --> J[write helper<br/>schema gate · duplicate gate]
+    J --> K[(memory folder)]
+    K --> L[indexes rebuilt]
+    L --> B
+    G --> M([session ends])
+    M --> L
 ```
 
-`global` is a standing rule that changes behaviour on any task, whatever the repo, language or
-tool. `domain` is bound to one of those, and is demoted to the catalog where `/recall` still finds
-it. **An absent `scope` means `global`** — deliberately, because defaulting absence the other way
-would empty the always-on tier on the first rebuild after upgrading, which is a far worse failure
-than carrying one rule too many.
+Three diagrams — a session, a memory's life, the loop between sessions — and the reasoning behind
+each part: **[How it works →](docs/how-it-works.md)**
 
-Any memory may also declare a **domain** — the repo, tool or ticket prefix it is about:
-
-```yaml
-metadata:
-  type: reference
-  domain: payments, mysql
-```
-
-The write helper enforces the shape (kebab-case tokens, comma-separated). `rebuild-index.sh` appends
-` · domain: …` to the catalog line and writes a third derived file, `memory/.domain-index`, one row per
-(domain, memory). Nothing in retrieval *requires* it; it exists so the prompt-time hook can surface a
-memory when the working directory or the prompt names its domain, without opening every file.
-
-The catalog also lists Claude Code's own per-project auto-memory (`projects/*/memory/`) under a
-*Native auto-memory* heading — read-only, never scored, never in the always-on tier — so one grep
-covers both silos instead of `/recall` needing a separate glob for the second.
-
-The tier has a byte budget (`RAEMEMBERIT_ALWAYS_ON_BUDGET`) because the harness silently declines to
-inject an oversized payload: it writes the payload to a file, hands the model a short preview and a
-path, and reports no error. `rebuild-index.sh` records the verdict in `.index-status`; the
-`SessionStart` tripwire reports an injection that actually got truncated, detected from the
-artifacts the harness itself leaves rather than from any guess about where its ceiling sits.
-
-## The sanitization gate
-
-`tools/sanitize-scan.sh` blocks identifying and secret-shaped content. Run its self-test
-before trusting it:
-
-```bash
-tools/test-sanitize-scan.sh      # the gate's own self-test
-tools/install-hooks.sh           # wire it as pre-commit
-tools/sanitize-scan.sh           # scan the tree
-```
-
-The denylist is **additive and split on purpose**: `tools/denylist.example.txt` carries
-universal secret shapes and is always loaded; private vocabulary lives in
-`.denylist.local.txt` (gitignored) and *extends* the shapes rather than replacing them. A
-denylist of an organisation's internal terms, committed to a public repo, is itself the
-disclosure it was written to prevent — so it is not in here.
-
-The gate treats **scanning zero files as an error, not a pass**, and carries no file
-exclusions: an excluded file is a blind spot, and a gate with blind spots is decoration.
-
-## Trying it
+## Documentation
 
 | | |
 |---|---|
-| **`docs/ADOPTING.md`** | what it is, what is known to be rough, how to back out |
-| **`docs/QUICKSTART.md`** | fifteen minutes — in your own config directory, or an isolated one first |
+| [Getting started](docs/getting-started.md) | install, the first ten minutes, the two habits |
+| [How it works](docs/how-it-works.md) | the diagrams, the two tiers, the write path |
+| [Cadence](docs/cadence.md) | what runs by itself, what you run, and when |
+| [Commands and hooks](docs/commands.md) | the five commands and the twelve hooks |
+| [Configuration](docs/configuration.md) | every knob, tiering, domain tags, the router's modes |
+| [Upgrading](docs/upgrading.md) | what an update touches and what it never does; uninstall |
+| [Troubleshooting](docs/troubleshooting.md) | each warning `status` can show, and its fix |
+| [Advanced](docs/advanced.md) | the three install routes, every flag, where the corpus lives |
+| [Development](docs/development.md) | the test suites, the sanitization gate, building the plugin |
+| [Internals](docs/internals.md) | the lifecycle stage by stage, and every piece of state |
 
-**Adopting into a setup you have already customized is a supported path**, not a later conversation:
-`./raememberit install` leaves your commands alone and names any memory hooks you already have instead
-of quietly running both. See `docs/ADOPTING.md`; the mechanics are in `docs/ADVANCED.md`.
+## Status
 
-## Where the corpus lives, and how writes get there
+Alpha. Extracted from one engineer's daily setup and generalized; installable with one command,
+460 assertions green on every push, and the update path measured rather than promised. The
+prompt-time router ships in shadow mode until its precision has been measured on your corpus.
 
-**Inside the config directory**, at `<config>/memory` — so the whole directory stays a single
-portable, copy-pasteable unit. The path is also published as `env.RAEMEMBERIT_MEMORY_DIR`.
+## Contributing
 
-That placement costs something, and it was engineered around rather than accepted. Claude Code
-classifies any path inside a `.claude` directory as a **sensitive file**, and the Edit and Write
-*tools* refuse it per file. An `Edit(<config>/memory/**)` allow rule does **not** override that gate
-— tested; still refused. But the gate applies only to those tools:
-
-| | inside `.claude` |
-|---|---|
-| Read tool | not gated |
-| Edit / Write tools | **refused per file**, allow rule does not help |
-| Bash | **works** |
-
-So the write path is `engine/mem-write.sh`, invoked over Bash and permitted by a single `Bash(...)`
-allow rule the installer adds. No per-file prompts, and the corpus stays where it belongs.
-
-The side benefit turned out to be the bigger one: a helper can **enforce** the schema, which the
-Write tool never could. It refuses a memory with no `description:`, a `name:` that does not match the
-filename, a missing `metadata.type:`, a `feedback` or `project` entry with no **Why:** / **How to
-apply:**, or an overwrite without `--update`. Then it rebuilds the indexes and exits non-zero if the
-write left a near-duplicate behind.
-
-## Tests
-
-```bash
-tools/test-all.sh
-```
-
-460 assertions across the sanitization gate, the duplicate-prevention loop, the write helper's
-schema enforcement, and a full install-then-reinstall-then-uninstall cycle.
-
-Plus two things that check the project against itself rather than against an expectation someone
-typed:
-
-- **`starter/baseline.json`** — a frozen retrieval score for the shipped starter corpus: literal
-  8/12, expanded 12/12. That gap *is* the measured value of the recall command's query-expansion
-  step, and a change to any starter rule's description that breaks retrieval fails the run.
-- **`tools/test-tripwire.sh`** — the delivery path: tiering, the always-on budget, and the
-  truncation tripwire. Past an undocumented size ceiling the harness does not inject a hook's
-  `additionalContext` — it writes the payload to a file and reports no error, so an index that grew
-  too large stopped being delivered while every other assertion stayed green. This suite is hostile
-  about the two ways such an alarm fails quietly: under-reporting, and crying about a fault already
-  fixed. Its own assertions are mutation-tested — narrowing the attribution match, ignoring the
-  rebuild verdict, flipping the tier default, or letting an over-budget rebuild exit clean each
-  turn it red.
-- **`tools/test-docs.sh`** — a documentation-consistency check. It verifies that the hook table in
-  this README still matches the wiring it was generated from, that no protocol template has lost its
-  corpus slot, that the installed git hook matches its source, that the baseline still describes a
-  fresh install, and **that the assertion count in the sentence above is still true.** Two numbers in
-  these docs were already stale when it was written; a hand-typed figure rots within days, so where
-  one cannot be generated it is at least verified.
-
-## Testing in isolation
-
-Point `CLAUDE_CONFIG_DIR` at a throwaway directory and Claude Code relocates its entire config
-there — settings, skills, commands, corpus, session history. Verified: a sandbox session's writes
-never reached the default corpus across an entire development session (identical fingerprint
-before and after).
-
-```bash
-export CLAUDE_CONFIG_DIR=~/somewhere/sandbox/.claude
-```
-
-Two things to know before trusting it:
-
-**Auth does not carry over.** Each config dir gets its own credentials, so a sandbox needs its own
-`/login` — once. After that it can be driven unattended with `claude -p`.
-
-**It isolates writes, not reads.** `CLAUDE_CONFIG_DIR` does not change `$HOME`, so a session can
-still read the default config at its absolute path — and one did, unprompted, while looking for
-prior art, absorbing the other setup's voice along with it. Permission `deny` rules for
-`Read(<live>/**)` and `Edit(<live>/**)` close the tool-based route (`Edit` covers all file-editing
-tools; a separate `Write` rule is not matched), but they do **not** constrain arbitrary Bash — so
-state the boundary in the sandbox's own `CLAUDE.md` as well. Setting a fake `$HOME` would close
-the path-based route completely but breaks authentication, so it is not recommended.
-
-A test that reads the thing it is isolating from has proven nothing.
-
-## Uninstall
-
-```bash
-./raememberit uninstall                     # removes the tools, KEEPS your memories
-./raememberit uninstall --and-my-memories   # also deletes them, after you type "delete my memories"
-```
-
-It removes only its own reminders, commands, permission rules, env entries, the plugin directory it
-placed, and the note it added to your `CLAUDE.md` — checked by marker, so a `CLAUDE.md` you wrote
-yourself is untouched. Your settings, your own hooks and your notes are left as they were — asserted,
-not merely promised, including that no surviving hook points at a file that is gone. Memories are
-plain markdown and stay readable with this tool gone.
+`tools/test-all.sh` before a commit; the sanitization gate runs as the pre-commit hook. A fix lands
+with its failing test first. [Development →](docs/development.md)
 
 ## License
 
-
-MIT — see `LICENSE`. The copyright holder is unset pending the first public push.
+MIT — see [`LICENSE`](LICENSE).
