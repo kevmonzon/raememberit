@@ -6,6 +6,19 @@ behind each change lives in the commit that made it — `git log` is the long fo
 Versions before `0.4.0` predate this file; their history is in `git log` and is not reconstructed
 here, because a changelog written after the fact from subject lines is a guess wearing a date.
 
+## Unreleased
+
+### A front door for people who do not know what a hook is
+
+`./raememberit install | update | status | uninstall`. One word, at most three plain questions,
+a preview of what will happen, a confirmation, and a summary of what changed — in words that need
+no knowledge of hooks, corpora or plugins, which a test enforces by grepping the happy-path output
+for a jargon list. It chooses the recommended route itself, detects an existing install and
+upgrades instead, names edited commands and patched tools before touching anything, and with
+nobody at the terminal takes every default and finishes. `install.sh` and `uninstall.sh` are
+unchanged and reachable through `--advanced`. Uninstall keeps the memories unless
+`--and-my-memories` is given *and* the phrase "delete my memories" is typed.
+
 ## 0.6.0
 
 An audit of the update path, and the first hooks that make retrieval and learning involuntary
