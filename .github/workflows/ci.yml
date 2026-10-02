@@ -14,8 +14,12 @@ jobs:
           fetch-depth: 0    # the upgrade matrix installs older versions from git history
 
       - name: Write the private denylist if one was provided
-        if: ${{ secrets.RAEMEMBERIT_DENYLIST != '' }}
-        run: printf '%s\n' "${{ secrets.RAEMEMBERIT_DENYLIST }}" > .denylist.local.txt
+        env:
+          DENYLIST: ${{ secrets.RAEMEMBERIT_DENYLIST }}
+        run: |
+          if [ -n "$DENYLIST" ]; then
+            printf '%s\n' "$DENYLIST" > .denylist.local.txt
+          fi
 
       - name: Toolchain
         run: |
