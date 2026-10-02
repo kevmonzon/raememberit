@@ -151,6 +151,15 @@ F=$(bash "$ROOT/tools/test-tripwire.sh"     | tail -1 | awk '{print $1}')
 G=$(bash "$ROOT/tools/test-context.sh"      | tail -1 | awk '{print $1}')
 H=$(bash "$ROOT/tools/test-wizard.sh"       | tail -1 | awk '{print $1}')
 I=$(bash "$ROOT/tools/test-eval.sh"         | tail -1 | awk '{print $1}')
+# A suite that dies before its tally leaves a sentence here, not a number. Arithmetic on it killed
+# this script with "Re: unbound variable" and hid which suite had died. Name it instead.
+check_tally() {  # var suite
+  local n; eval "n=\$$1"
+  case "$n" in ''|*[!0-9]*) bad "$2 ended without a tally — its last line began '${n:-<nothing>}'"; eval "$1=0";; esac
+}
+check_tally A test-sanitize-scan.sh; check_tally B test-dedup.sh;   check_tally C test-mem-write.sh
+check_tally D test-install.sh;       check_tally E test-plugin.sh;  check_tally F test-tripwire.sh
+check_tally G test-context.sh;       check_tally H test-wizard.sh;  check_tally I test-eval.sh
 TOT=$((A+B+C+D+E+F+G+H+I))
 for f in README.md docs/development.md; do
   claimed=$(grep -oE '[0-9]+ (automated )?assertions' "$ROOT/$f" | head -1 | awk '{print $1}')

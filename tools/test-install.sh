@@ -356,13 +356,15 @@ echo "=== the fragment step is manual, so the installer says when it was skipped
 # Pasting the fragment is the one step nothing enforces, and skipping it produces an install that
 # reports every step green and then does nothing — the silent success this kit exists to catch.
 F="${TMPDIR:-/tmp}/raememberit-frag.$$"; rm -rf "$F"; mkdir -p "$F"
-"$ROOT/install.sh" --config-dir "$F" --user Casey --no-guided >"$F.log1" 2>&1
+# The installer also reads ./CLAUDE.md, so the cwd is part of the input. Run from the target, or
+# this repository's own CLAUDE.md — which names /recall and /learn — satisfies the check.
+(cd "$F" && "$ROOT/install.sh" --config-dir "$F" --user Casey --no-guided) >"$F.log1" 2>&1
 ckt "warns when no CLAUDE.md exists at all" "grep -q 'mentions a memory corpus' '$F.log1'"
 
 # A CLAUDE.md that exists but says nothing about memory must still warn — otherwise the check
 # degrades into "is there a file", which every repo satisfies.
 printf '# Project notes\n\nUse tabs. Run make.\n' > "$F/CLAUDE.md"
-"$ROOT/install.sh" --config-dir "$F" --user Casey --no-guided >"$F.log2" 2>&1
+(cd "$F" && "$ROOT/install.sh" --config-dir "$F" --user Casey --no-guided) >"$F.log2" 2>&1
 ckt "still warns when the CLAUDE.md is unrelated" "grep -q 'mentions a memory corpus' '$F.log2'"
 
 # THE FALSE POSITIVE THIS REPLACED. A first version grepped for the kit's own name and therefore

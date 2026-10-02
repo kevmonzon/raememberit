@@ -190,7 +190,15 @@ echo "== configuration reaches the model as context =="
 sid="testsuite-$(date +%s)-$RANDOM"
 guard="${TMPDIR:-/tmp}/raememberit-injected-$sid"
 rm -f "$guard"
-out="$(printf '{"session_id":"%s"}' "$sid" | RAEMEMBERIT_USER=Testee bash engine/hooks/inject-memory.sh 2>/dev/null)"
+# The hook reads whatever corpus the environment points at. Without one of its own, this assertion
+# read the developer's live corpus and passed there — and failed on a bare CI runner, which has
+# none. A fixture makes it measure the hook rather than the machine.
+ic="$(mktemp -d)"; mkdir -p "$ic/memory"
+printf '# Memory Index\n\n- [fixture](fixture.md) — one entry\n' > "$ic/memory/MEMORY.md"
+out="$(printf '{"session_id":"%s"}' "$sid" \
+  | CLAUDE_CONFIG_DIR="$ic" RAEMEMBERIT_MEMORY_DIR="$ic/memory" RAEMEMBERIT_USER=Testee \
+    bash engine/hooks/inject-memory.sh 2>/dev/null)"
+rm -rf "$ic"
 if [ -z "$out" ]; then
   bad "inject-memory.sh produced nothing"
 else
